@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เลื่องชื่อลือชา POS | Inventory ร่างทอง 100%</title>
+    <title>เลื่องชื่อลือชา POS | ร่างทอง 100% (Full System)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -13,6 +13,8 @@
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
         .active-nav { background: #78350f; color: white; box-shadow: 0 10px 15px -3px rgba(120, 53, 15, 0.3); }
+        .report-card { transition: all 0.3s ease; cursor: pointer; border: 1px solid #fef3c7; }
+        .report-card:hover { transform: translateY(-5px); border-color: #fbbf24; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
         .status-badge { @apply px-3 py-1 rounded-full text-[10px] font-bold uppercase; }
     </style>
 </head>
@@ -20,7 +22,7 @@
 
 <div id="app" class="flex h-screen overflow-hidden">
     
-    <!-- Sidebar Navigation -->
+    <!-- SIDEBAR NAVIGATION -->
     <nav class="w-20 md:w-64 bg-white border-r border-amber-100 flex flex-col no-print">
         <div class="p-6 text-center">
             <h1 class="hidden md:block text-2xl font-black text-amber-900">เลื่องชื่อลือชา</h1>
@@ -37,146 +39,19 @@
             <button @click="currentTab = 'reports'" :class="['w-full flex items-center gap-3 p-4 rounded-2xl transition-all', currentTab === 'reports' ? 'active-nav' : 'hover:bg-amber-50 text-amber-900/60']">
                 <i data-lucide="bar-chart-3"></i> <span class="hidden md:block font-bold">รายงาน</span>
             </button>
+            <button @click="currentTab = 'expenses'" :class="['w-full flex items-center gap-3 p-4 rounded-2xl transition-all', currentTab === 'expenses' ? 'active-nav' : 'hover:bg-amber-50 text-amber-900/60']">
+                <i data-lucide="wallet"></i> <span class="hidden md:block font-bold">รายจ่าย</span>
+            </button>
             <button @click="currentTab = 'settings'" :class="['w-full flex items-center gap-3 p-4 rounded-2xl transition-all', currentTab === 'settings' ? 'active-nav' : 'hover:bg-amber-50 text-amber-900/60']">
                 <i data-lucide="settings"></i> <span class="hidden md:block font-bold">ตั้งค่า</span>
             </button>
         </div>
     </nav>
 
-    <!-- Main Content Area -->
+    <!-- MAIN CONTENT -->
     <main class="flex-1 flex flex-col overflow-hidden relative">
         
-        <!-- SECTION: INVENTORY DASHBOARD -->
-        <section v-if="currentTab === 'inventory'" class="p-6 overflow-y-auto h-full custom-scroll animate-in fade-in">
-            <div class="flex justify-between items-center mb-8">
-                <h2 class="text-3xl font-black text-amber-900">บริหารคลังสินค้า</h2>
-                <div class="flex gap-3">
-                    <button @click="openProductModal()" class="bg-amber-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg hover:bg-amber-700">
-                        <i data-lucide="plus-circle"></i> เพิ่มสินค้า/SKU
-                    </button>
-                </div>
-            </div>
-
-            <!-- 6 Dashboard Cards -->
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm">
-                    <p class="text-gray-400 text-xs font-bold">สินค้าทั้งหมด</p>
-                    <h3 class="text-2xl font-black text-slate-800">{{ invStats.totalSKU }} <span class="text-xs font-normal">SKU</span></h3>
-                </div>
-                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm">
-                    <p class="text-gray-400 text-xs font-bold">ติดตามสต็อก</p>
-                    <h3 class="text-2xl font-black text-blue-600">{{ invStats.trackingCount }} <span class="text-xs font-normal">รายการ</span></h3>
-                </div>
-                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm border-l-4 border-l-orange-400">
-                    <p class="text-orange-400 text-xs font-bold">ใกล้หมด</p>
-                    <h3 class="text-2xl font-black text-orange-600">{{ invStats.lowStockCount }}</h3>
-                </div>
-                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm border-l-4 border-l-red-400">
-                    <p class="text-red-400 text-xs font-bold">หมดแล้ว</p>
-                    <h3 class="text-2xl font-black text-red-600">{{ invStats.outOfStockCount }}</h3>
-                </div>
-                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm">
-                    <p class="text-gray-400 text-xs font-bold">คงเหลือรวม</p>
-                    <h3 class="text-2xl font-black text-amber-600">{{ invStats.totalRemaining }} <span class="text-xs font-normal">ชิ้น</span></h3>
-                </div>
-                <div class="bg-amber-900 p-4 rounded-3xl shadow-lg">
-                    <p class="text-amber-200 text-xs font-bold">มูลค่าสต็อก</p>
-                    <h3 class="text-xl font-black text-white">{{ invStats.inventoryValue.toLocaleString() }} ฿</h3>
-                </div>
-            </div>
-
-            <!-- Inventory Tabs -->
-            <div class="flex gap-4 mb-6 border-b border-amber-100">
-                <button @click="invSubTab = 'items'" :class="['pb-4 px-2 font-bold transition-all', invSubTab === 'items' ? 'border-b-4 border-amber-600 text-amber-600' : 'text-gray-400']">รายการสินค้า</button>
-                <button @click="invSubTab = 'movements'" :class="['pb-4 px-2 font-bold transition-all', invSubTab === 'movements' ? 'border-b-4 border-amber-600 text-amber-600' : 'text-gray-400']">การเคลื่อนไหว (Movement)</button>
-            </div>
-
-            <!-- Tab: Items List -->
-            <div v-if="invSubTab === 'items'" class="bg-white rounded-[2.5rem] shadow-sm border border-amber-50 overflow-hidden">
-                <table class="w-full text-left">
-                    <thead class="bg-amber-50 text-amber-900 font-bold text-sm">
-                        <tr>
-                            <th class="p-6">สินค้า</th>
-                            <th>หมวดหมู่</th>
-                            <th>ต้นทุน</th>
-                            <th>ราคาขาย</th>
-                            <th>คงเหลือ</th>
-                            <th>สถานะ</th>
-                            <th>จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-amber-50">
-                        <tr v-for="p in products" :key="p.id" class="hover:bg-amber-50/30 transition-colors">
-                            <td class="p-4 flex items-center gap-3">
-                                <img :src="p.image" class="w-10 h-10 rounded-xl object-cover">
-                                <div>
-                                    <p class="font-bold text-sm">{{ p.name }}</p>
-                                    <p class="text-[10px] text-gray-400">SKU: {{ p.sku || 'N/A' }}</p>
-                                </div>
-                            </td>
-                            <td class="text-sm">{{ p.category }}</td>
-                            <td class="text-sm font-bold">{{ p.cost }} ฿</td>
-                            <td class="text-sm font-bold text-amber-600">{{ p.price }} ฿</td>
-                            <td class="text-sm">
-                                <span v-if="p.trackStock" :class="['font-black text-lg', p.stock <= p.minStock ? 'text-red-500' : 'text-slate-700']">{{ p.stock }}</span>
-                                <span v-else class="text-gray-300 italic">ไม่ติดตาม</span>
-                            </td>
-                            <td>
-                                <span v-if="!p.trackStock" class="status-badge bg-gray-100 text-gray-400">ไม่ติดตาม</span>
-                                <span v-else-if="p.stock <= 0" class="status-badge bg-red-100 text-red-600">หมดสต็อก</span>
-                                <span v-else-if="p.stock <= p.minStock" class="status-badge bg-orange-100 text-orange-600">ใกล้หมด</span>
-                                <span v-else class="status-badge bg-green-100 text-green-600">พร้อมขาย</span>
-                            </td>
-                            <td>
-                                <div class="flex gap-2">
-                                    <button @click="openAdjustModal(p)" class="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100" title="ปรับสต็อก"><i data-lucide="package-plus" size="18"></i></button>
-                                    <button @click="openProductModal(p)" class="p-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100"><i data-lucide="edit-3" size="18"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Tab: Movements History -->
-            <div v-if="invSubTab === 'movements'" class="bg-white rounded-[2.5rem] shadow-sm border border-amber-50 overflow-hidden">
-                <table class="w-full text-left">
-                    <thead class="bg-slate-50 text-slate-600 font-bold text-sm">
-                        <tr>
-                            <th class="p-6">วันที่/เวลา</th>
-                            <th>สินค้า</th>
-                            <th>ประเภท</th>
-                            <th>ก่อน</th>
-                            <th>เปลี่ยน</th>
-                            <th>หลัง</th>
-                            <th>ผู้ทำรายการ</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-50">
-                        <tr v-for="m in stockMovements" :key="m.id" class="text-sm">
-                            <td class="p-4 text-gray-400">{{ m.date }}</td>
-                            <td class="font-bold">{{ getProductName(m.productId) }}</td>
-                            <td>
-                                <span :class="['px-2 py-1 rounded-lg text-[10px] font-bold', 
-                                    m.type === 'Sale' ? 'bg-blue-100 text-blue-600' : 
-                                    m.type === 'Receive' ? 'bg-green-100 text-green-600' : 
-                                    m.type === 'Cancel Sale' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100']">
-                                    {{ m.type }}
-                                </span>
-                            </td>
-                            <td>{{ m.before }}</td>
-                            <td :class="m.change > 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'">
-                                {{ m.change > 0 ? '+' + m.change : m.change }}
-                            </td>
-                            <td class="font-black">{{ m.after }}</td>
-                            <td>{{ m.user }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- SECTION: POS (หน้าขาย) -->
+        <!-- 1. SECTION: POS -->
         <section v-if="currentTab === 'pos'" class="flex h-full overflow-hidden animate-in fade-in">
             <div class="flex-1 p-6 overflow-y-auto custom-scroll">
                 <div class="flex justify-between items-center mb-6">
@@ -200,7 +75,6 @@
                     </div>
                 </div>
             </div>
-
             <!-- Cart Sidebar -->
             <div class="w-96 bg-white border-l border-amber-50 flex flex-col shadow-2xl no-print">
                 <div class="p-6 border-b flex justify-between items-center">
@@ -233,88 +107,208 @@
             </div>
         </section>
 
-        <!-- MODAL: เพิ่ม/แก้ไข สินค้า -->
+        <!-- 2. SECTION: INVENTORY -->
+        <section v-if="currentTab === 'inventory'" class="p-6 overflow-y-auto h-full custom-scroll animate-in fade-in">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-black text-amber-900">บริหารคลังสินค้า</h2>
+                <button @click="openProductModal()" class="bg-amber-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg hover:bg-amber-700">
+                    <i data-lucide="plus-circle"></i> เพิ่มสินค้า/SKU
+                </button>
+            </div>
+            <!-- Inventory Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm">
+                    <p class="text-gray-400 text-xs font-bold">สินค้าทั้งหมด</p>
+                    <h3 class="text-2xl font-black text-slate-800">{{ invStats.totalSKU }} <span class="text-xs font-normal">SKU</span></h3>
+                </div>
+                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm">
+                    <p class="text-gray-400 text-xs font-bold">ติดตามสต็อก</p>
+                    <h3 class="text-2xl font-black text-blue-600">{{ invStats.trackingCount }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm border-l-4 border-l-orange-400">
+                    <p class="text-orange-400 text-xs font-bold">ใกล้หมด</p>
+                    <h3 class="text-2xl font-black text-orange-600">{{ invStats.lowStockCount }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm border-l-4 border-l-red-400">
+                    <p class="text-red-400 text-xs font-bold">หมดแล้ว</p>
+                    <h3 class="text-2xl font-black text-red-600">{{ invStats.outOfStockCount }}</h3>
+                </div>
+                <div class="bg-white p-4 rounded-3xl border border-amber-50 shadow-sm">
+                    <p class="text-gray-400 text-xs font-bold">คงเหลือรวม</p>
+                    <h3 class="text-2xl font-black text-amber-600">{{ invStats.totalRemaining }}</h3>
+                </div>
+                <div class="bg-amber-900 p-4 rounded-3xl shadow-lg">
+                    <p class="text-amber-200 text-xs font-bold">มูลค่าสต็อก</p>
+                    <h3 class="text-xl font-black text-white">{{ invStats.inventoryValue.toLocaleString() }} ฿</h3>
+                </div>
+            </div>
+            <!-- Inventory Tabs -->
+            <div class="flex gap-4 mb-6 border-b border-amber-100">
+                <button @click="invSubTab = 'items'" :class="['pb-4 px-2 font-bold transition-all', invSubTab === 'items' ? 'border-b-4 border-amber-600 text-amber-600' : 'text-gray-400']">รายการสินค้า</button>
+                <button @click="invSubTab = 'movements'" :class="['pb-4 px-2 font-bold transition-all', invSubTab === 'movements' ? 'border-b-4 border-amber-600 text-amber-600' : 'text-gray-400']">การเคลื่อนไหว (Movement)</button>
+            </div>
+            <!-- Items List -->
+            <div v-if="invSubTab === 'items'" class="bg-white rounded-[2.5rem] shadow-sm border border-amber-50 overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-amber-50 text-amber-900 font-bold text-sm">
+                        <tr><th class="p-6">สินค้า</th><th>หมวดหมู่</th><th>ต้นทุน</th><th>ราคาขาย</th><th>คงเหลือ</th><th>สถานะ</th><th>จัดการ</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-amber-50">
+                        <tr v-for="p in products" :key="p.id" class="hover:bg-amber-50/30 transition-colors">
+                            <td class="p-4 flex items-center gap-3">
+                                <img :src="p.image" class="w-10 h-10 rounded-xl object-cover">
+                                <div><p class="font-bold text-sm">{{ p.name }}</p><p class="text-[10px] text-gray-400">SKU: {{ p.sku }}</p></div>
+                            </td>
+                            <td class="text-sm">{{ p.category }}</td>
+                            <td class="text-sm font-bold">{{ p.cost }} ฿</td>
+                            <td class="text-sm font-bold text-amber-600">{{ p.price }} ฿</td>
+                            <td class="text-sm font-black">{{ p.trackStock ? p.stock : '-' }}</td>
+                            <td>
+                                <span v-if="!p.trackStock" class="status-badge bg-gray-100 text-gray-400">ไม่ติดตาม</span>
+                                <span v-else-if="p.stock <= 0" class="status-badge bg-red-100 text-red-600">หมดสต็อก</span>
+                                <span v-else-if="p.stock <= p.minStock" class="status-badge bg-orange-100 text-orange-600">ใกล้หมด</span>
+                                <span v-else class="status-badge bg-green-100 text-green-600">พร้อมขาย</span>
+                            </td>
+                            <td>
+                                <div class="flex gap-2">
+                                    <button @click="openAdjustModal(p)" class="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100"><i data-lucide="package-plus" size="18"></i></button>
+                                    <button @click="openProductModal(p)" class="p-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100"><i data-lucide="edit-3" size="18"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Movement List -->
+            <div v-if="invSubTab === 'movements'" class="bg-white rounded-[2.5rem] shadow-sm border border-amber-50 overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-slate-600 font-bold text-sm">
+                        <tr><th class="p-6">วันที่/เวลา</th><th>สินค้า</th><th>ประเภท</th><th>ก่อน</th><th>เปลี่ยน</th><th>หลัง</th><th>ผู้ทำรายการ</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-50">
+                        <tr v-for="m in stockMovements" :key="m.id" class="text-sm">
+                            <td class="p-4 text-gray-400">{{ m.date }}</td>
+                            <td class="font-bold">{{ getProductName(m.productId) }}</td>
+                            <td><span class="status-badge bg-gray-100">{{ m.type }}</span></td>
+                            <td>{{ m.before }}</td>
+                            <td :class="m.change > 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'">{{ m.change > 0 ? '+'+m.change : m.change }}</td>
+                            <td class="font-black">{{ m.after }}</td>
+                            <td>{{ m.user }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 3. SECTION: REPORTS (12 Modules) -->
+        <section v-if="currentTab === 'reports'" class="p-6 overflow-y-auto h-full custom-scroll animate-in fade-in">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 bg-white p-4 rounded-[2rem] shadow-sm border border-amber-50">
+                <h2 class="text-2xl font-black text-amber-900">รายงานวิเคราะห์ร้าน</h2>
+                <div class="flex bg-gray-100 p-1 rounded-xl">
+                    <button v-for="t in ['วันนี้', '7 วัน', '30 วัน']" @click="reportTimeRange = t" :class="['px-4 py-2 rounded-lg text-sm font-bold transition-all', reportTimeRange === t ? 'bg-white shadow-sm text-amber-600' : 'text-gray-400']">{{ t }}</button>
+                </div>
+            </div>
+            <!-- Top Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-amber-600 p-6 rounded-[2.5rem] text-white shadow-xl shadow-amber-100">
+                    <p class="opacity-80 font-bold">ยอดขายทั้งหมด</p>
+                    <h3 class="text-4xl font-black">{{ stats.totalSales.toLocaleString() }} ฿</h3>
+                </div>
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-amber-50">
+                    <p class="text-gray-400 font-bold">จำนวนบิล</p>
+                    <h3 class="text-3xl font-black text-slate-800">{{ stats.totalBills }} บิล</h3>
+                </div>
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-amber-50">
+                    <p class="text-gray-400 font-bold">กำไรสุทธิ</p>
+                    <h3 class="text-3xl font-black text-green-600">{{ stats.netProfit.toLocaleString() }} ฿</h3>
+                </div>
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-amber-50">
+                    <p class="text-gray-400 font-bold">จุดคุ้มทุน (วันนี้)</p>
+                    <h3 class="text-3xl font-black text-blue-600">{{ stats.breakEven }} แก้ว</h3>
+                </div>
+            </div>
+            <!-- 12 Modules Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div v-for="m in reportModules" @click="openReportDetail(m.id)" class="report-card bg-white p-6 rounded-[2.5rem]">
+                    <div class="flex justify-between items-start mb-4">
+                        <div :class="['p-3 rounded-2xl', m.color]"><i :data-lucide="m.icon"></i></div>
+                        <i data-lucide="chevron-right" class="text-gray-300"></i>
+                    </div>
+                    <h4 class="font-black text-lg">{{ m.title }}</h4>
+                    <p class="text-xs text-gray-400">{{ m.desc }}</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. SECTION: EXPENSES -->
+        <section v-if="currentTab === 'expenses'" class="p-8 overflow-y-auto h-full custom-scroll animate-in fade-in">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-black text-amber-900">บันทึกรายจ่าย</h2>
+                <button @click="showExpenseModal = true" class="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg hover:bg-red-600">
+                    <i data-lucide="minus-circle"></i> เพิ่มรายการจ่าย
+                </button>
+            </div>
+            <div class="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-amber-50">
+                <table class="w-full text-left">
+                    <thead class="bg-red-50 text-red-900 font-bold"><tr><th class="p-6">วันที่</th><th>รายการ</th><th>หมวดหมู่</th><th>จำนวนเงิน</th></tr></thead>
+                    <tbody class="divide-y divide-amber-50">
+                        <tr v-for="ex in expenses" class="hover:bg-red-50/20"><td class="p-6 text-sm text-gray-400">{{ ex.date }}</td><td class="font-bold">{{ ex.title }}</td><td>{{ ex.category }}</td><td class="font-bold text-red-600">- {{ ex.amount }} ฿</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- MODALS (Product, Adjust, Payment, ReportDetail, Expense) -->
+        <!-- (Product Modal) -->
         <div v-if="showProductModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div class="bg-white w-full max-w-lg rounded-[3rem] p-8 shadow-2xl overflow-y-auto max-h-[90vh] custom-scroll">
                 <h2 class="text-2xl font-black mb-6">{{ editMode ? 'แก้ไขข้อมูลสินค้า' : 'เพิ่มสินค้าใหม่' }}</h2>
                 <div class="space-y-4">
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="text-xs font-bold text-gray-400">ชื่อสินค้า</label>
-                            <input v-model="formProduct.name" type="text" class="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-amber-500">
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-gray-400">SKU / Barcode</label>
-                            <input v-model="formProduct.sku" type="text" class="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-amber-500">
-                        </div>
+                        <div><label class="text-xs font-bold text-gray-400">ชื่อสินค้า</label><input v-model="formProduct.name" type="text" class="w-full p-3 bg-gray-50 rounded-xl outline-none border"></div>
+                        <div><label class="text-xs font-bold text-gray-400">SKU</label><input v-model="formProduct.sku" type="text" class="w-full p-3 bg-gray-50 rounded-xl outline-none border"></div>
                     </div>
                     <div class="grid grid-cols-3 gap-4">
-                        <div>
-                            <label class="text-xs font-bold text-gray-400">ต้นทุน (Cost)</label>
-                            <input v-model.number="formProduct.cost" type="number" class="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-amber-500">
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-gray-400">ราคาขาย (Price)</label>
-                            <input v-model.number="formProduct.price" type="number" class="w-full p-3 bg-gray-50 rounded-xl outline-none border focus:border-amber-500">
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-gray-400">หมวดหมู่</label>
-                            <select v-model="formProduct.category" class="w-full p-3 bg-gray-50 rounded-xl outline-none border">
-                                <option v-for="c in categories" :value="c">{{ c }}</option>
-                            </select>
-                        </div>
+                        <div><label class="text-xs font-bold text-gray-400">ต้นทุน</label><input v-model.number="formProduct.cost" type="number" class="w-full p-3 bg-gray-50 rounded-xl outline-none border"></div>
+                        <div><label class="text-xs font-bold text-gray-400">ราคาขาย</label><input v-model.number="formProduct.price" type="number" class="w-full p-3 bg-gray-50 rounded-xl outline-none border"></div>
+                        <div><label class="text-xs font-bold text-gray-400">หมวดหมู่</label><select v-model="formProduct.category" class="w-full p-3 bg-gray-50 rounded-xl outline-none border"><option v-for="c in categories" :value="c">{{ c }}</option></select></div>
                     </div>
                     <div class="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                        <div class="flex items-center justify-between mb-4">
-                            <span class="font-bold text-amber-900">เปิดใช้งานการติดตามสต็อก</span>
-                            <input type="checkbox" v-model="formProduct.trackStock" class="w-6 h-6 accent-amber-600">
-                        </div>
-                        <div v-if="formProduct.trackStock" class="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                            <div>
-                                <label class="text-xs font-bold text-amber-600">จำนวนคงเหลือปัจจุบัน</label>
-                                <input v-model.number="formProduct.stock" type="number" class="w-full p-3 bg-white rounded-xl outline-none border border-amber-200">
-                            </div>
-                            <div>
-                                <label class="text-xs font-bold text-amber-600">แจ้งเตือนเมื่อต่ำกว่า (Min)</label>
-                                <input v-model.number="formProduct.minStock" type="number" class="w-full p-3 bg-white rounded-xl outline-none border border-amber-200">
-                            </div>
+                        <div class="flex items-center justify-between mb-4"><span class="font-bold text-amber-900">ติดตามสต็อก</span><input type="checkbox" v-model="formProduct.trackStock" class="w-6 h-6 accent-amber-600"></div>
+                        <div v-if="formProduct.trackStock" class="grid grid-cols-2 gap-4">
+                            <div><label class="text-xs font-bold text-amber-600">คงเหลือ</label><input v-model.number="formProduct.stock" type="number" class="w-full p-3 bg-white rounded-xl border border-amber-200"></div>
+                            <div><label class="text-xs font-bold text-amber-600">ขั้นต่ำ (Min)</label><input v-model.number="formProduct.minStock" type="number" class="w-full p-3 bg-white rounded-xl border border-amber-200"></div>
                         </div>
                     </div>
-                    <div>
-                        <label class="text-xs font-bold text-gray-400">URL รูปภาพ</label>
-                        <input v-model="formProduct.image" type="text" class="w-full p-3 bg-gray-50 rounded-xl outline-none border">
-                    </div>
+                    <div><label class="text-xs font-bold text-gray-400">URL รูปภาพ</label><input v-model="formProduct.image" type="text" class="w-full p-3 bg-gray-50 rounded-xl outline-none border"></div>
                 </div>
                 <div class="grid grid-cols-2 gap-4 mt-8">
                     <button @click="showProductModal = false" class="py-4 font-bold text-gray-400">ยกเลิก</button>
-                    <button @click="saveProduct" class="bg-amber-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-amber-700">บันทึกข้อมูล</button>
+                    <button @click="saveProduct" class="bg-amber-600 text-white py-4 rounded-2xl font-bold shadow-lg">บันทึกข้อมูล</button>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL: ปรับสต็อก (Receive/Adjust) -->
+        <!-- (Adjust Modal) -->
         <div v-if="showAdjustModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div class="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl">
                 <h2 class="text-2xl font-black mb-2">ปรับสต็อกสินค้า</h2>
                 <p class="text-gray-400 mb-6">{{ selectedProduct.name }} (คงเหลือ: {{ selectedProduct.stock }})</p>
-                
                 <div class="space-y-4">
                     <div class="flex gap-2">
                         <button @click="adjustType = 'Receive'" :class="['flex-1 py-3 rounded-xl font-bold border-2', adjustType === 'Receive' ? 'border-green-500 bg-green-50 text-green-600' : 'border-gray-100']">รับเข้า (+)</button>
                         <button @click="adjustType = 'Adjust-'" :class="['flex-1 py-3 rounded-xl font-bold border-2', adjustType === 'Adjust-' ? 'border-red-500 bg-red-50 text-red-600' : 'border-gray-100']">ปรับลด (-)</button>
                     </div>
                     <input v-model.number="adjustQty" type="number" placeholder="ระบุจำนวน..." class="w-full text-center text-3xl font-black p-6 bg-gray-50 rounded-2xl outline-none border-2 focus:border-amber-500">
-                    <input v-model="adjustNote" type="text" placeholder="หมายเหตุ (ถ้ามี)" class="w-full p-3 bg-gray-50 rounded-xl outline-none border">
                 </div>
-
                 <div class="grid grid-cols-2 gap-4 mt-8">
                     <button @click="showAdjustModal = false" class="py-4 font-bold text-gray-400">ยกเลิก</button>
-                    <button @click="confirmAdjustment" class="bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-lg">ยืนยันการปรับยอด</button>
+                    <button @click="confirmAdjustment" class="bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-lg">ยืนยัน</button>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL: ชำระเงิน (หักสต็อกที่นี่) -->
+        <!-- (Payment Modal) -->
         <div v-if="showPayment" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
             <div class="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl text-center">
                 <h2 class="text-3xl font-black mb-6">รับชำระเงิน</h2>
@@ -330,6 +324,32 @@
             </div>
         </div>
 
+        <!-- (Report Detail Modal) -->
+        <div v-if="reportDetail" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+            <div class="bg-white w-full max-w-4xl h-[80vh] rounded-[3rem] p-8 shadow-2xl flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-black">{{ reportDetailTitle }}</h2>
+                    <button @click="reportDetail = null" class="p-2 bg-gray-100 rounded-full"><i data-lucide="x"></i></button>
+                </div>
+                <div class="flex-1 overflow-y-auto custom-scroll">
+                    <div v-if="reportDetail === 'bills'" class="space-y-4">
+                        <div v-for="bill in orders" class="flex justify-between items-center p-4 bg-gray-50 rounded-2xl">
+                            <div><p class="font-bold">#{{ bill.id }}</p><p class="text-xs text-gray-400">{{ bill.date }}</p></div>
+                            <div class="text-right"><p class="font-black text-amber-600">{{ bill.total }} ฿</p></div>
+                        </div>
+                    </div>
+                    <div v-if="reportDetail === 'bestseller'" class="space-y-4">
+                        <div v-for="(item, i) in bestSellers" class="flex items-center gap-4 p-4 bg-white border rounded-2xl">
+                            <span class="text-2xl font-black text-gray-200">0{{ i+1 }}</span>
+                            <div class="flex-1"><p class="font-bold">{{ item.name }}</p><p class="text-xs text-gray-400">ขายได้ {{ item.qty }} แก้ว</p></div>
+                            <p class="font-black text-amber-600">{{ item.sales }} ฿</p>
+                        </div>
+                    </div>
+                    <div v-else class="flex items-center justify-center h-full text-gray-400 italic">กำลังพัฒนาส่วนแสดงผลเพิ่มเติม...</div>
+                </div>
+            </div>
+        </div>
+
     </main>
 </div>
 
@@ -340,52 +360,71 @@ createApp({
     setup() {
         const currentTab = ref('pos');
         const invSubTab = ref('items');
-        
-        // Data States
+        const reportTimeRange = ref('วันนี้');
+        const reportDetail = ref(null);
+        const reportDetailTitle = ref('');
+
+        // DATA STATES
         const products = ref([
             { id: 1, name: 'ชาไทยเลื่องชื่อ', sku: 'TH-TEA-01', price: 45, cost: 12, category: 'เมนูชา', stock: 49, minStock: 10, trackStock: true, image: 'https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?w=400' },
             { id: 2, name: 'กาแฟลือชา', sku: 'CF-SIG-02', price: 60, cost: 15, category: 'เมนูกาแฟ', stock: 20, minStock: 5, trackStock: true, image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400' }
         ]);
         const stockMovements = ref([]);
         const orders = ref([]);
+        const expenses = ref([]);
         const categories = ref(['ทั้งหมด', 'เมนูชา', 'เมนูกาแฟ', 'นมสด', 'โซดา']);
 
-        // UI States
+        // UI STATES
         const searchQuery = ref('');
-        const activeCategory = ref('ทั้งหมด');
         const cart = ref([]);
         const showProductModal = ref(false);
         const showAdjustModal = ref(false);
         const showPayment = ref(false);
+        const showExpenseModal = ref(false);
         const editMode = ref(false);
         const selectedProduct = ref(null);
         
-        // Form States
+        // FORM STATES
         const formProduct = ref({ name: '', sku: '', price: 0, cost: 0, category: 'เมนูชา', stock: 0, minStock: 5, trackStock: true, image: '' });
         const adjustType = ref('Receive');
         const adjustQty = ref(null);
-        const adjustNote = ref('');
         const cashReceived = ref(null);
 
-        // Persistence
+        // REPORT MODULES CONFIG
+        const reportModules = [
+            { id: 'sales', title: 'ยอดขาย', desc: 'ยอดสด/โอน · ยอดเฉลี่ย · รายชั่วโมง', icon: 'trending-up', color: 'bg-amber-50 text-amber-600' },
+            { id: 'payment', title: 'ช่องทางชำระ', desc: 'เงินสด vs เงินโอน', icon: 'credit-card', color: 'bg-blue-50 text-blue-600' },
+            { id: 'profit', title: 'ต้นทุน & กำไร', desc: 'Margin และกำไรสุทธิ', icon: 'pie-chart', color: 'bg-green-50 text-green-600' },
+            { id: 'delivery', title: 'ยอดขายเดลิเวอรี่', desc: 'Grab, LINE MAN หลังหัก GP', icon: 'bike', color: 'bg-orange-50 text-orange-600' },
+            { id: 'expenses', title: 'รายจ่าย', desc: 'ค่าเช่า, ค่าน้ำ, ค่าไฟ, ค่าแรง', icon: 'receipt', color: 'bg-red-50 text-red-600' },
+            { id: 'breakeven', title: 'จุดคุ้มทุน', desc: 'ต้องขายเท่าไรถึงจะพอจ่าย', icon: 'target', color: 'bg-indigo-50 text-indigo-600' },
+            { id: 'vat', title: 'ภาษี VAT 7%', desc: 'ฐานก่อนภาษี และ VAT', icon: 'percent', color: 'bg-slate-50 text-slate-600' },
+            { id: 'bestseller', title: 'สินค้าขายดี', desc: 'อันดับตามจำนวนหรือยอดขาย', icon: 'award', color: 'bg-purple-50 text-purple-600' },
+            { id: 'trends', title: 'แนวโน้ม', desc: 'เปรียบเทียบช่วงเวลาก่อนหน้า', icon: 'line-chart', color: 'bg-pink-50 text-pink-600' },
+            { id: 'staff', title: 'ยอดขายตามพนักงาน', desc: 'แยกยอดและจำนวนบิลต่อคน', icon: 'users', color: 'bg-cyan-50 text-cyan-600' },
+            { id: 'bills', title: 'รายการบิล / ใบเสร็จ', desc: 'ค้นหาและดูใบเสร็จย้อนหลัง', icon: 'file-text', color: 'bg-slate-100 text-slate-800' },
+            { id: 'summary', title: 'สรุปยอดขายทั้งหมด', desc: 'ภาพรวมร้านในช่วงเวลาที่เลือก', icon: 'layout', color: 'bg-amber-100 text-amber-900' }
+        ];
+
+        // PERSISTENCE
         onMounted(() => {
-            const savedProducts = localStorage.getItem('lc_products');
-            if (savedProducts) products.value = JSON.parse(savedProducts);
-            const savedMovements = localStorage.getItem('lc_movements');
-            if (savedMovements) stockMovements.value = JSON.parse(savedMovements);
-            const savedOrders = localStorage.getItem('lc_orders');
-            if (savedOrders) orders.value = JSON.parse(savedOrders);
+            const keys = ['products', 'movements', 'orders', 'expenses', 'categories'];
+            keys.forEach(k => {
+                const saved = localStorage.getItem(`lc_${k}`);
+                if (saved) window[k === 'products' ? 'products' : k === 'movements' ? 'stockMovements' : k].value = JSON.parse(saved);
+            });
             lucide.createIcons();
         });
 
-        watch([products, stockMovements, orders], () => {
+        watch([products, stockMovements, orders, expenses], () => {
             localStorage.setItem('lc_products', JSON.stringify(products.value));
             localStorage.setItem('lc_movements', JSON.stringify(stockMovements.value));
             localStorage.setItem('lc_orders', JSON.stringify(orders.value));
+            localStorage.setItem('lc_expenses', JSON.stringify(expenses.value));
             setTimeout(() => lucide.createIcons(), 10);
         }, { deep: true });
 
-        // Inventory Logic
+        // COMPUTED STATS
         const invStats = computed(() => {
             const tracking = products.value.filter(p => p.trackStock);
             return {
@@ -398,79 +437,47 @@ createApp({
             };
         });
 
+        const stats = computed(() => {
+            const totalSales = orders.value.reduce((sum, o) => sum + o.total, 0);
+            const totalCost = orders.value.reduce((sum, o) => sum + o.items.reduce((s, i) => s + (i.cost * i.qty), 0), 0);
+            const totalExp = expenses.value.reduce((sum, e) => sum + e.amount, 0);
+            return {
+                totalSales,
+                totalBills: orders.value.length,
+                netProfit: totalSales - totalCost - totalExp,
+                breakEven: 15 // Mock
+            };
+        });
+
+        const bestSellers = computed(() => {
+            const map = {};
+            orders.value.forEach(o => o.items.forEach(i => {
+                if (!map[i.name]) map[i.name] = { name: i.name, qty: 0, sales: 0 };
+                map[i.name].qty += i.qty;
+                map[i.name].sales += i.totalPrice * i.qty;
+            }));
+            return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 5);
+        });
+
+        // LOGIC FUNCTIONS
         const getProductName = (id) => products.value.find(p => p.id === id)?.name || 'Unknown';
 
-        const logMovement = (productId, type, change, before, after, note = '') => {
-            stockMovements.value.unshift({
-                id: Date.now(),
-                productId,
-                type,
-                change,
-                before,
-                after,
-                note,
-                date: new Date().toLocaleString(),
-                user: 'Admin'
-            });
+        const logMovement = (productId, type, change, before, after) => {
+            stockMovements.value.unshift({ id: Date.now(), productId, type, change, before, after, date: new Date().toLocaleString(), user: 'Admin' });
         };
 
-        const openProductModal = (p = null) => {
-            if (p) {
-                editMode.value = true;
-                formProduct.value = { ...p };
-            } else {
-                editMode.value = false;
-                formProduct.value = { id: Date.now(), name: '', sku: '', price: 0, cost: 0, category: 'เมนูชา', stock: 0, minStock: 5, trackStock: true, image: '' };
-            }
-            showProductModal.value = true;
-        };
-
-        const saveProduct = () => {
-            if (editMode.value) {
-                const idx = products.value.findIndex(p => p.id === formProduct.value.id);
-                products.value[idx] = { ...formProduct.value };
-            } else {
-                products.value.push({ ...formProduct.value });
-            }
-            showProductModal.value = false;
-        };
-
-        const openAdjustModal = (p) => {
-            selectedProduct.value = p;
-            adjustQty.value = null;
-            adjustNote.value = '';
-            showAdjustModal.value = true;
-        };
-
-        const confirmAdjustment = () => {
-            const p = products.value.find(prod => prod.id === selectedProduct.value.id);
-            const before = p.stock;
-            const change = adjustType.value === 'Receive' ? adjustQty.value : -adjustQty.value;
-            p.stock += change;
-            logMovement(p.id, adjustType.value, change, before, p.stock, adjustNote.value);
-            showAdjustModal.value = false;
-        };
-
-        // POS Logic
-        const filteredProducts = computed(() => {
-            return products.value.filter(p => (activeCategory.value === 'ทั้งหมด' || p.category === activeCategory.value) && p.name.includes(searchQuery.value));
-        });
+        const filteredProducts = computed(() => products.value.filter(p => p.name.includes(searchQuery.value)));
 
         const selectProduct = (p) => {
             if (p.trackStock && p.stock <= 0) return alert('สินค้าหมดสต็อก!');
             const item = cart.value.find(i => i.id === p.id);
-            if (item) {
-                if (p.trackStock && item.qty + 1 > p.stock) return alert('สินค้าในสต็อกไม่พอ!');
-                item.qty++;
-            } else {
-                cart.value.push({ ...p, qty: 1, totalPrice: p.price });
-            }
+            if (item) item.qty++; else cart.value.push({ ...p, qty: 1, totalPrice: p.price });
         };
 
         const updateCartQty = (idx, delta) => {
             const item = cart.value[idx];
             const p = products.value.find(prod => prod.id === item.id);
-            if (delta > 0 && p.trackStock && item.qty + 1 > p.stock) return alert('สินค้าในสต็อกไม่พอ!');
+            if (delta > 0 && p.trackStock && item.qty + 1 > p.stock) return alert('สต็อกไม่พอ!');
             item.qty += delta;
             if (item.qty <= 0) cart.value.splice(idx, 1);
         };
@@ -478,35 +485,54 @@ createApp({
         const cartTotal = computed(() => cart.value.reduce((sum, i) => sum + (i.totalPrice * i.qty), 0));
 
         const completeSale = () => {
-            // หักสต็อกเฉพาะเมื่อชำระเงินสำเร็จ
             cart.value.forEach(item => {
                 const p = products.value.find(prod => prod.id === item.id);
                 if (p && p.trackStock) {
                     const before = p.stock;
                     p.stock -= item.qty;
-                    logMovement(p.id, 'Sale', -item.qty, before, p.stock, `Order #${Date.now()}`);
+                    logMovement(p.id, 'Sale', -item.qty, before, p.stock);
                 }
             });
+            orders.value.unshift({ id: Date.now(), items: [...cart.value], total: cartTotal.value, date: new Date().toLocaleString() });
+            cart.value = []; showPayment.value = false; cashReceived.value = null;
+            alert('ขายสำเร็จ!');
+        };
 
-            orders.value.unshift({
-                id: Date.now(),
-                items: [...cart.value],
-                total: cartTotal.value,
-                date: new Date().toLocaleString()
-            });
+        const openProductModal = (p = null) => {
+            if (p) { editMode.value = true; formProduct.value = { ...p }; }
+            else { editMode.value = false; formProduct.value = { id: Date.now(), name: '', sku: '', price: 0, cost: 0, category: 'เมนูชา', stock: 0, minStock: 5, trackStock: true, image: '' }; }
+            showProductModal.value = true;
+        };
 
-            alert('ชำระเงินสำเร็จ และหักสต็อกเรียบร้อย!');
-            cart.value = [];
-            showPayment.value = false;
-            cashReceived.value = null;
+        const saveProduct = () => {
+            if (editMode.value) { const idx = products.value.findIndex(p => p.id === formProduct.value.id); products.value[idx] = { ...formProduct.value }; }
+            else products.value.push({ ...formProduct.value });
+            showProductModal.value = false;
+        };
+
+        const openAdjustModal = (p) => { selectedProduct.value = p; adjustQty.value = null; showAdjustModal.value = true; };
+
+        const confirmAdjustment = () => {
+            const p = products.value.find(prod => prod.id === selectedProduct.value.id);
+            const before = p.stock;
+            const change = adjustType.value === 'Receive' ? adjustQty.value : -adjustQty.value;
+            p.stock += change;
+            logMovement(p.id, adjustType.value, change, before, p.stock);
+            showAdjustModal.value = false;
+        };
+
+        const openReportDetail = (id) => {
+            reportDetail.value = id;
+            reportDetailTitle.value = reportModules.find(m => m.id === id).title;
         };
 
         return {
-            currentTab, invSubTab, products, stockMovements, invStats, getProductName,
-            searchQuery, activeCategory, categories, filteredProducts, selectProduct,
-            cart, cartTotal, updateCartQty, showPayment, cashReceived, completeSale,
-            showProductModal, editMode, formProduct, openProductModal, saveProduct,
-            showAdjustModal, selectedProduct, adjustType, adjustQty, adjustNote, openAdjustModal, confirmAdjustment
+            currentTab, invSubTab, reportTimeRange, reportDetail, reportDetailTitle, reportModules,
+            products, stockMovements, orders, expenses, categories, invStats, stats, bestSellers,
+            searchQuery, cart, cartTotal, updateCartQty, selectProduct, completeSale,
+            showProductModal, showAdjustModal, showPayment, showExpenseModal, editMode, formProduct,
+            selectedProduct, adjustType, adjustQty, openProductModal, saveProduct, openAdjustModal, confirmAdjustment,
+            openReportDetail, getProductName
         };
     }
 }).mount('#app');
