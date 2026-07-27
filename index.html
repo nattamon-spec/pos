@@ -16,6 +16,11 @@
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
         .product-card:active { transform: scale(0.95); }
+        
+        /* สไตล์ปุ่มตัวเลือก */
+        .btn-option { border: 1px solid #e5e7eb; transition: all 0.2s; }
+        .btn-option.active { background-color: #1a94aa; color: white; border-color: #1a94aa; }
+        
         @media print {
             .no-print { display: none; }
             .print-only { display: block !important; }
@@ -53,7 +58,7 @@
         <!-- Grid สินค้า -->
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 overflow-y-auto custom-scroll pr-2">
             <div v-for="product in filteredProducts" :key="product.id" 
-                @click="addToCart(product)"
+                @click="openOptionModal(product)"
                 class="product-card bg-white p-3 rounded-[2rem] shadow-sm hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-amber-400 group">
                 <div class="relative overflow-hidden rounded-[1.5rem] mb-3 aspect-square">
                     <img :src="product.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
@@ -89,16 +94,20 @@
                 <i data-lucide="coffee" size="48" class="mb-2"></i>
                 <p>ยังไม่มีสินค้าในตะกร้า</p>
             </div>
-            <div v-for="item in cart" :key="item.id" class="flex items-center gap-4 bg-gray-50 p-3 rounded-2xl">
+            <div v-for="(item, index) in cart" :key="index" class="flex items-center gap-4 bg-gray-50 p-3 rounded-2xl">
                 <img :src="item.image" class="w-14 h-14 rounded-xl object-cover shadow-sm">
                 <div class="flex-1">
                     <h4 class="font-bold text-sm leading-tight">{{ item.name }}</h4>
-                    <p class="text-amber-600 font-black text-sm">{{ item.price * item.quantity }} ฿</p>
+                    <p class="text-[10px] text-gray-400">
+                        ไซส์: {{ item.selectedSize.label }} 
+                        <span v-if="item.selectedToppings.length">, {{ item.selectedToppings.map(t => t.label).join('+') }}</span>
+                    </p>
+                    <p class="text-amber-600 font-black text-sm">{{ item.totalPricePerUnit * item.quantity }} ฿</p>
                 </div>
                 <div class="flex items-center bg-white rounded-xl p-1 shadow-sm border">
-                    <button @click="updateQty(item.id, -1)" class="p-1 hover:bg-gray-100 rounded-lg transition"><i data-lucide="minus" size="14"></i></button>
+                    <button @click="updateQty(index, -1)" class="p-1 hover:bg-gray-100 rounded-lg transition"><i data-lucide="minus" size="14"></i></button>
                     <span class="w-8 text-center font-bold text-sm">{{ item.quantity }}</span>
-                    <button @click="updateQty(item.id, 1)" class="p-1 hover:bg-gray-100 rounded-lg transition"><i data-lucide="plus" size="14"></i></button>
+                    <button @click="updateQty(index, 1)" class="p-1 hover:bg-gray-100 rounded-lg transition"><i data-lucide="plus" size="14"></i></button>
                 </div>
             </div>
         </div>
@@ -119,6 +128,93 @@
                 class="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-2xl font-bold text-xl shadow-lg shadow-amber-200 transition-all active:scale-[0.98] disabled:bg-gray-300 disabled:shadow-none">
                 ชำระเงิน
             </button>
+        </div>
+    </div>
+
+    <!-- ป๊อปอัปตัวเลือกสินค้า (ตามภาพ) -->
+    <div v-if="showOptionModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] no-print">
+        <div class="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-200">
+            <!-- Header -->
+            <div class="p-6 border-b flex justify-between items-center">
+                <h2 class="text-xl font-black text-[#1a94aa]">ยืนยันจำนวนสินค้า</h2>
+                <div class="flex gap-3">
+                    <button class="text-gray-400"><i data-lucide="info" size="20"></i></button>
+                    <button @click="showOptionModal = false" class="text-red-400 hover:text-red-600"><i data-lucide="x-circle" size="24"></i></button>
+                </div>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- ฝั่งซ้าย: ข้อมูลสินค้าและจำนวน -->
+                <div class="space-y-4">
+                    <div class="flex gap-4 p-4 border rounded-[1.5rem] bg-gray-50">
+                        <img :src="selectedProduct.image" class="w-24 h-24 rounded-2xl object-cover shadow-sm">
+                        <div>
+                            <h3 class="text-xl font-black">{{ selectedProduct.name }}</h3>
+                            <p class="text-sm text-gray-500">ราคา <span class="text-red-500 font-bold">{{ selectedProduct.price }}</span> บาท</p>
+                            <p class="text-xs text-gray-400">คงเหลือ {{ selectedProduct.stock }} ชิ้น</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 border rounded-[1.5rem]">
+                        <span class="font-bold">จำนวน</span>
+                        <div class="flex items-center gap-4">
+                            <button @click="tempQty = Math.max(1, tempQty - 1)" class="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center font-bold text-xl">-</button>
+                            <span class="text-2xl font-black w-8 text-center">{{ tempQty }}</span>
+                            <button @click="if(tempQty < selectedProduct.stock) tempQty++" class="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-500 flex items-center justify-center font-bold text-xl">+</button>
+                        </div>
+                    </div>
+
+                    <div class="p-4 space-y-1">
+                        <div class="flex justify-between text-sm text-gray-500">
+                            <span>ไซส์ - {{ tempSize.label }}</span>
+                            <span>{{ tempSize.price }}</span>
+                        </div>
+                        <div class="flex justify-between text-xl font-black">
+                            <span>ราคารวม</span>
+                            <span class="text-red-500">{{ currentTotalPrice }} บาท</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ฝั่งขวา: ตัวเลือก ไซส์ และ ท็อปปิ้ง -->
+                <div class="space-y-6">
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="font-bold">ไซส์</span>
+                            <span class="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">จำเป็น</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button v-for="s in sizeOptions" :key="s.label"
+                                @click="tempSize = s"
+                                :class="['btn-option py-3 rounded-2xl font-bold text-sm', tempSize.label === s.label ? 'active' : 'bg-white']">
+                                {{ s.label }} <br> <span class="text-[10px] opacity-70">+{{ s.price }}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="font-bold">ท็อปปิ้ง</span>
+                            <span class="bg-gray-100 text-gray-500 text-[10px] px-2 py-0.5 rounded-full">ไม่บังคับ</span>
+                            <span class="text-[10px] text-gray-400">เลือกได้หลายอย่าง</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button v-for="t in toppingOptions" :key="t.label"
+                                @click="toggleTopping(t)"
+                                :class="['btn-option py-2 px-3 rounded-2xl font-bold text-xs flex justify-between items-center', isToppingSelected(t) ? 'active' : 'bg-white']">
+                                {{ t.label }} <span>+{{ t.price }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Button -->
+            <div class="p-6 bg-gray-50">
+                <button @click="confirmAddToCart" class="w-full bg-[#1a94aa] hover:bg-[#157a8a] text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95">
+                    <i data-lucide="shopping-cart"></i> เพิ่มลงตะกร้า
+                </button>
+            </div>
         </div>
     </div>
 
@@ -160,9 +256,12 @@
         <h2 class="text-xl font-bold">เลื่องชื่อลือชา</h2>
         <p>สาขาต้นตำรับ</p>
         <div class="border-t border-dashed my-4"></div>
-        <div v-for="item in cart" class="flex justify-between my-1">
-            <span>{{ item.name }} x {{ item.quantity }}</span>
-            <span>{{ item.price * item.quantity }}</span>
+        <div v-for="item in cart" class="flex justify-between my-1 text-left">
+            <div class="flex-1">
+                <span>{{ item.name }} ({{ item.selectedSize.label }})</span><br>
+                <small v-if="item.selectedToppings.length">+{{ item.selectedToppings.map(t => t.label).join(',') }}</small>
+            </div>
+            <span>{{ item.quantity }} x {{ item.totalPricePerUnit }}</span>
         </div>
         <div class="border-t border-dashed my-4"></div>
         <div class="flex justify-between font-bold text-lg">
@@ -196,16 +295,34 @@
             const showPayment = ref(false);
             const cashReceived = ref(null);
 
+            // ข้อมูลตัวเลือก
+            const sizeOptions = [
+                { label: 'S', price: 0 },
+                { label: 'M', price: 5 },
+                { label: 'L', price: 10 }
+            ];
+            const toppingOptions = [
+                { label: 'วิปครีม', price: 20 },
+                { label: 'ครีมชีส', price: 20 },
+                { label: 'ชีสขูด', price: 20 },
+                { label: 'ช็อค+ชีสขูด', price: 20 },
+                { label: 'ดับเบิ้ลช็อค+ชีส', price: 40 }
+            ];
+
+            // ข้อมูลสินค้า (เพิ่ม stock)
             const products = ref([
-                { id: 1, name: 'ชาไทยเลื่องชื่อ', price: 45, category: 'เมนูชา', image: 'https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?w=400' },
-                { id: 2, name: 'ชาเขียวมัทฉะ', price: 55, category: 'เมนูชา', image: 'https://images.unsplash.com/photo-1582793988951-9aed5509eb97?w=400' },
-                { id: 3, name: 'กาแฟลือชา (Signature)', price: 60, category: 'เมนูกาแฟ', image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400' },
-                { id: 4, name: 'อเมริกาโน่ส้ม', price: 65, category: 'เมนูกาแฟ', image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400' },
-                { id: 5, name: 'นมสดฮอกไกโด', price: 50, category: 'นมสด/โกโก้', image: 'https://images.unsplash.com/photo-1550583724-125581f77833?w=400' },
-                { id: 6, name: 'โกโก้เข้มข้น', price: 50, category: 'นมสด/โกโก้', image: 'https://images.unsplash.com/photo-1544787210-228394c3d3e0?w=400' },
-                { id: 7, name: 'แดงโซดามะนาว', price: 40, category: 'โซดา', image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400' },
-                { id: 8, name: 'บลูฮาวาย', price: 40, category: 'โซดา', image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400' },
+                { id: 1, name: 'โกโก้', price: 35, category: 'นมสด/โกโก้', stock: 30, image: 'https://images.unsplash.com/photo-1544787210-228394c3d3e0?w=400' },
+                { id: 2, name: 'ชาไทยเลื่องชื่อ', price: 45, category: 'เมนูชา', stock: 50, image: 'https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?w=400' },
+                { id: 3, name: 'ชาเขียวมัทฉะ', price: 55, category: 'เมนูชา', stock: 20, image: 'https://images.unsplash.com/photo-1582793988951-9aed5509eb97?w=400' },
+                { id: 4, name: 'กาแฟลือชา', price: 60, category: 'เมนูกาแฟ', stock: 15, image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400' },
             ]);
+
+            // สถานะสำหรับ Modal ตัวเลือก
+            const showOptionModal = ref(false);
+            const selectedProduct = ref(null);
+            const tempQty = ref(1);
+            const tempSize = ref(sizeOptions[0]);
+            const tempToppings = ref([]);
 
             // โหลดข้อมูลจาก LocalStorage
             onMounted(() => {
@@ -229,23 +346,63 @@
             });
 
             const totalItems = computed(() => cart.value.reduce((sum, item) => sum + item.quantity, 0));
-            const totalPrice = computed(() => cart.value.reduce((sum, item) => sum + (item.price * item.quantity), 0));
+            const totalPrice = computed(() => cart.value.reduce((sum, item) => sum + (item.totalPricePerUnit * item.quantity), 0));
 
-            const addToCart = (product) => {
-                const item = cart.value.find(i => i.id === product.id);
-                if (item) {
-                    item.quantity++;
+            // คำนวณราคาสดใน Modal
+            const currentTotalPrice = computed(() => {
+                if (!selectedProduct.value) return 0;
+                const toppingPrice = tempToppings.value.reduce((sum, t) => sum + t.price, 0);
+                return (selectedProduct.value.price + tempSize.value.price + toppingPrice) * tempQty.value;
+            });
+
+            // เปิด Modal ตัวเลือก
+            const openOptionModal = (product) => {
+                selectedProduct.value = product;
+                tempQty.value = 1;
+                tempSize.value = sizeOptions[0];
+                tempToppings.value = [];
+                showOptionModal.value = true;
+                setTimeout(() => lucide.createIcons(), 10);
+            };
+
+            // เลือก/ยกเลิก ท็อปปิ้ง
+            const toggleTopping = (topping) => {
+                const index = tempToppings.value.findIndex(t => t.label === topping.label);
+                if (index > -1) {
+                    tempToppings.value.splice(index, 1);
                 } else {
-                    cart.value.push({ ...product, quantity: 1 });
+                    tempToppings.value.push(topping);
                 }
             };
 
-            const updateQty = (id, delta) => {
-                const item = cart.value.find(i => i.id === id);
+            const isToppingSelected = (topping) => {
+                return tempToppings.value.some(t => t.label === topping.label);
+            };
+
+            // ยืนยันเพิ่มลงตะกร้า
+            const confirmAddToCart = () => {
+                const toppingPrice = tempToppings.value.reduce((sum, t) => sum + t.price, 0);
+                const finalPricePerUnit = selectedProduct.value.price + tempSize.value.price + toppingPrice;
+                
+                cart.value.push({
+                    id: selectedProduct.value.id,
+                    name: selectedProduct.value.name,
+                    image: selectedProduct.value.image,
+                    quantity: tempQty.value,
+                    selectedSize: { ...tempSize.value },
+                    selectedToppings: [...tempToppings.value],
+                    totalPricePerUnit: finalPricePerUnit
+                });
+                
+                showOptionModal.value = false;
+            };
+
+            const updateQty = (index, delta) => {
+                const item = cart.value[index];
                 if (item) {
                     item.quantity += delta;
                     if (item.quantity <= 0) {
-                        cart.value = cart.value.filter(i => i.id !== id);
+                        cart.value.splice(index, 1);
                     }
                 }
             };
@@ -268,8 +425,12 @@
 
             return {
                 categories, activeCategory, searchQuery, products, cart,
-                filteredProducts, totalItems, totalPrice, addToCart, updateQty,
-                clearCart, showPayment, cashReceived, openPayment, completeSale
+                filteredProducts, totalItems, totalPrice, updateQty,
+                clearCart, showPayment, cashReceived, openPayment, completeSale,
+                // Modal Exports
+                showOptionModal, selectedProduct, tempQty, tempSize, tempToppings,
+                sizeOptions, toppingOptions, openOptionModal, toggleTopping,
+                isToppingSelected, currentTotalPrice, confirmAddToCart
             };
         }
     }).mount('#app');
