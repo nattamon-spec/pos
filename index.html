@@ -70,4 +70,195 @@
         </section>
 
         <!-- KITCHEN PAGE -->
-        <section id="page-kitchen" class="p-4 hid
+        <section id="page-kitchen" class="p-4 hidden">
+            <h2 class="text-xl font-bold mb-6">Kitchen Display</h2>
+            <div id="kitchen-list" class="space-y-4"></div>
+        </section>
+
+        <!-- REPORT PAGE -->
+        <section id="page-report" class="p-4 hidden">
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
+                <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1 tracking-tighter">ยอดขายวันนี้</p>
+                <h2 id="rep-sales" class="text-5xl font-bold text-blue-600 tracking-tighter">฿0</h2>
+            </div>
+            <canvas id="salesChart" class="mb-10"></canvas>
+            <div id="staff-rep" class="space-y-2"></div>
+        </section>
+
+        <!-- STOCK PAGE -->
+        <section id="page-stock" class="p-4 hidden">
+            <div class="flex justify-between items-center mb-6 px-1">
+                <h3 class="font-bold">รายการสินค้า</h3>
+                <button onclick="openAdminModal()" class="btn-touch bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-bold">+ เพิ่มสินค้า</button>
+            </div>
+            <div id="admin-list" class="space-y-3 mb-10"></div>
+            <button onclick="seedInitial()" class="w-full py-4 text-gray-200 text-[10px] uppercase font-bold italic border border-dashed rounded-2xl">✨ Re-Install System</button>
+        </section>
+    </div>
+
+    <!-- CART BAR -->
+    <div id="cart-bar" class="fixed bottom-24 left-4 right-4 bg-white p-5 rounded-[2.5rem] shadow-2xl flex justify-between items-center hidden z-40 border border-blue-50">
+        <div class="flex items-center gap-4">
+            <div id="cart-qty" class="bg-blue-600 text-white w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold">0</div>
+            <div id="cart-total" class="text-2xl font-bold text-[#004A99] tracking-tighter">฿0</div>
+        </div>
+        <button onclick="openCheckout()" class="btn-touch bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-sm">ชำระเงิน</button>
+    </div>
+
+    <!-- BOTTOM TAB NAV -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-50 flex justify-around p-3 pb-8 z-50">
+        <button onclick="showPage('report')" id="nav-report" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
+            <span class="text-xl">📊</span><span class="text-[9px] font-bold uppercase">Report</span>
+        </button>
+        <button onclick="showPage('sell')" id="nav-sell" class="flex flex-col items-center gap-1 text-gray-300 tab-active btn-touch">
+            <span class="text-xl">🛒</span><span class="text-[9px] font-bold uppercase">Sell</span>
+        </button>
+        <button onclick="showPage('kitchen')" id="nav-kitchen" class="flex flex-col items-center gap-1 text-gray-300 relative btn-touch">
+            <span class="text-xl">👨‍🍳</span><span id="k-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1.5 rounded-full hidden">0</span>
+            <span class="text-[9px] font-bold uppercase">Kitchen</span>
+        </button>
+        <button onclick="showPage('stock')" id="nav-stock" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
+            <span class="text-xl">📦</span><span class="text-[9px] font-bold uppercase">Stock</span>
+        </button>
+    </nav>
+
+    <script>
+        // --- 1. FIREBASE CONFIG ---
+        const fbConfig = {
+            apiKey: "AIzaSyAvqnQ-j9nDKuXfmDe7Jr28cJcydnKxcjM",
+            authDomain: "leungcheuluecha.firebaseapp.com",
+            databaseURL: "https://leungcheuluecha-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "leungcheuluecha"
+        };
+        firebase.initializeApp(fbConfig);
+        const db = firebase.database();
+
+        let products = [], orders = [], cart = [], curPin = "";
+        let currentCat = "ทั้งหมด", editIdx = -1;
+
+        // --- 2. PIN LOGIC ---
+        function pressPin(num) {
+            if(curPin.length < 4) {
+                curPin += num;
+                updatePinDots();
+                if(curPin.length === 4) {
+                    setTimeout(checkPin, 200); // เช็คอัตโนมัติเมื่อครบ 4 หลัก
+                }
+            }
+        }
+        function clearPin() { curPin = ""; updatePinDots(); }
+        function updatePinDots() {
+            const dots = document.querySelectorAll('#pin-dots div');
+            dots.forEach((d, i) => {
+                if(i < curPin.length) {
+                    d.classList.replace('border-blue-100', 'bg-blue-600');
+                    d.classList.add('border-blue-600');
+                } else {
+                    d.classList.replace('bg-blue-600', 'border-blue-100');
+                    d.classList.remove('border-blue-600');
+                }
+            });
+        }
+        function checkPin() {
+            if(curPin === "1234") {
+                document.getElementById('auth-screen').classList.add('hidden');
+                clearPin();
+            } else {
+                alert("PIN ผิดพลาด! ลองใหม่อีกครั้ง (รหัสเริ่มต้น 1234)");
+                clearPin();
+            }
+        }
+        function forceUnlock() {
+            if(confirm("ต้องการเข้าสู่ระบบแบบฉุกเฉินใช่หรือไม่?")) {
+                document.getElementById('auth-screen').classList.add('hidden');
+            }
+        }
+        function logout() { location.reload(); }
+
+        // --- 3. DATA SYNC ---
+        db.ref('.info/connected').on('value', s => {
+            const st = document.getElementById('db-status');
+            st.innerText = s.val() ? "● ออนไลน์" : "Connecting...";
+            st.className = s.val() ? "text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-600" : "text-[9px] px-2.5 py-1 rounded-full font-bold bg-yellow-100 text-yellow-700";
+        });
+        db.ref('products').on('value', snap => { products = snap.val() || []; renderPOS(); renderStock(); });
+        db.ref('orders').on('value', snap => { orders = Object.entries(snap.val() || {}).map(([id,v])=>({id,...v})); renderKitchen(); updateStats(); });
+
+        // --- 4. CORE UI ---
+        function showPage(p) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('page-'+p).classList.remove('hidden');
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+            document.getElementById('nav-'+p).classList.add('tab-active');
+            updateCartBar();
+        }
+
+        function renderPOS() {
+            const grid = document.getElementById('pos-grid');
+            const search = (document.getElementById('search').value || "").toLowerCase();
+            const cats = ["ทั้งหมด", ...new Set(products.map(p => p.category || "ทั่วไป"))];
+            document.getElementById('pos-cats').innerHTML = cats.map(c => `<button onclick="setCat('${c}')" class="px-6 py-2 rounded-full font-bold text-[10px] border whitespace-nowrap uppercase ${currentCat===c?'bg-blue-600 text-white shadow-md':'bg-white text-gray-400'}">${c}</button>`).join('');
+            const filtered = products.filter(p => (currentCat==="ทั้งหมด" || (p.category||"ทั่วไป")===currentCat) && p.name.toLowerCase().includes(search));
+            grid.innerHTML = filtered.map(p => {
+                const idx = products.indexOf(p);
+                return `<div onclick="addToCart(${idx})" class="bg-white p-3 rounded-[2rem] shadow-sm border border-blue-50 btn-touch anim-up">
+                    <img src="${p.img || 'https://via.placeholder.com/200'}" class="w-full h-24 object-cover rounded-[1.5rem] mb-2 bg-gray-50">
+                    <div class="font-bold text-xs px-1 truncate">${p.name}</div>
+                    <div class="text-blue-600 font-bold text-sm px-1 italic">฿${p.price.toLocaleString()}</div>
+                </div>`;
+            }).join('') || '<div class="col-span-full py-20 text-center text-gray-300">ไม่มีข้อมูลสินค้า</div>';
+        }
+
+        function setCat(c) { currentCat = c; renderPOS(); }
+        function addToCart(idx) { cart.push(products[idx]); updateCartBar(); }
+        function updateCartBar() {
+            const bar = document.getElementById('cart-bar');
+            if(cart.length > 0 && !document.getElementById('page-sell').classList.contains('hidden')) {
+                bar.classList.remove('hidden');
+                const total = cart.reduce((s, i) => s + i.price, 0);
+                document.getElementById('cart-qty').innerText = cart.length;
+                document.getElementById('cart-total').innerText = "฿" + total.toLocaleString();
+            } else bar.classList.add('hidden');
+        }
+
+        function renderKitchen() {
+            const pending = orders.filter(o => o.status !== 'done');
+            document.getElementById('k-badge').innerText = pending.length;
+            document.getElementById('k-badge').classList.toggle('hidden', pending.length === 0);
+            document.getElementById('kitchen-list').innerHTML = pending.reverse().map(o => `
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50">
+                    <div class="flex justify-between mb-4"><span class="text-[10px] font-bold text-blue-400">ORDER #${o.id.slice(-4)}</span></div>
+                    <div class="space-y-1 mb-6">${o.items.map(i => `<div class="font-bold text-lg">● ${i.name}</div>`).join('')}</div>
+                    <button onclick="doneOrder('${o.id}')" class="w-full bg-[#E3F2FD] text-blue-600 py-4 rounded-2xl font-bold btn-touch">เสร็จสิ้น</button>
+                </div>`).join('') || '<p class="text-center py-20 text-gray-300">ไม่มีออเดอร์</p>';
+        }
+        function doneOrder(id) { db.ref(`orders/${id}`).update({ status: 'done' }); }
+
+        function renderStock() {
+            document.getElementById('stk-count').innerText = products.length;
+            document.getElementById('stk-value').innerText = `฿${products.reduce((s,p)=>s+((p.cost||0)*(p.stock||0)),0).toLocaleString()}`;
+            document.getElementById('admin-list').innerHTML = products.map((p, i) => `
+                <div class="bg-white p-4 rounded-3xl flex justify-between items-center border border-blue-50">
+                    <div class="flex items-center gap-3"><img src="${p.img || ''}" class="w-12 h-12 rounded-2xl object-cover bg-gray-100">
+                    <div><div class="font-bold text-sm">${p.name}</div><div class="text-[9px] text-blue-400 uppercase font-bold">สต็อก: ${p.stock||0}</div></div></div>
+                    <span class="text-blue-600 text-xs font-bold underline">แก้ไข</span>
+                </div>`).join('');
+        }
+
+        function seedInitial() {
+            if(!confirm("ติดตั้งสินค้าเริ่มต้น?")) return;
+            const data = [{ name: "ข้าวมันไก่ต้ม", price: 50, cost: 25, stock: 50, category: "อาหารหลัก", img: "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=300" }];
+            db.ref('products').set(data).then(() => alert("ติดตั้งสำเร็จ!"));
+        }
+
+        function updateStats() {
+            const today = new Date().toISOString().split('T')[0];
+            const filtered = orders.filter(o => o.date === today);
+            const total = filtered.reduce((s,o)=>s+o.total,0);
+            document.getElementById('rep-sales').innerText = `฿${total.toLocaleString()}`;
+        }
+
+        showPage('sell');
+    </script>
+</body>
+</html>
