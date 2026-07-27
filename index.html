@@ -14,9 +14,8 @@
         :root { --p-blue: #007AFF; --bg-cream: #FDFBF7; --soft-blue: #E3F2FD; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg-cream); color: #334155; touch-action: manipulation; }
         
-        /* ปุ่มจิ้มแล้วมีแรเงา/ยุบตัว */
         .btn-touch { transition: all 0.1s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .btn-touch:active { transform: scale(0.95); background-color: var(--soft-blue); filter: brightness(0.95); }
+        .btn-touch:active { transform: scale(0.95); background-color: var(--soft-blue); }
         .card-active:active { background-color: var(--soft-blue); border-color: var(--p-blue); }
 
         .tab-active { color: var(--p-blue) !important; border-top: 4px solid var(--p-blue); font-weight: 600; }
@@ -32,70 +31,26 @@
     <!-- HEADER -->
     <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-blue-50 shadow-sm">
         <h1 class="text-xl font-bold text-[#004A99] tracking-tighter uppercase">เลื่องชื่อลือชา</h1>
-        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-500 uppercase tracking-widest animate-pulse">Syncing...</div>
+        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-500 uppercase tracking-widest">● ออนไลน์</div>
     </header>
 
-    <div id="main-app">
-        <!-- 1. REPORTS (Analytics) -->
+    <div id="main-content">
+        <!-- 1. REPORTS -->
         <section id="page-report" class="p-4 hidden anim-up">
             <div class="flex gap-2 overflow-x-auto pb-4 hide-scroll">
                 <button onclick="updateStats('today')" class="range-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold">วันนี้</button>
                 <button onclick="updateStats('7days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
                 <button onclick="updateStats('30days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
             </div>
-
             <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
-                <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">ยอดขายสุทธิ</p>
+                <p class="text-[10px] font-bold text-blue-400 uppercase mb-1">ยอดขายทั้งหมด</p>
                 <h2 id="rep-total" class="text-6xl font-bold text-blue-600 tracking-tighter">฿0</h2>
             </div>
-
             <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-green-50 p-5 rounded-3xl border border-green-100">
+                <div class="bg-green-50 p-5 rounded-3xl border border-green-100 text-center">
                     <p class="text-[9px] text-green-600 font-bold uppercase">กำไรสุทธิ</p>
                     <p id="rep-profit" class="text-xl font-bold text-green-700">฿0</p>
                 </div>
-                <div class="bg-orange-50 p-5 rounded-3xl border border-orange-100">
+                <div class="bg-orange-50 p-5 rounded-3xl border border-orange-100 text-center">
                     <p class="text-[9px] text-orange-600 font-bold uppercase">ภาษี 7%</p>
-                    <p id="rep-tax" class="text-xl font-bold text-orange-700">฿0</p>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6">
-                <canvas id="salesChart"></canvas>
-            </div>
-
-            <div class="space-y-3 mb-10">
-                <div class="bg-blue-50 p-4 rounded-2xl flex justify-between items-center">
-                    <span class="text-sm font-bold">🛵 Delivery Sales</span><span id="rep-deli" class="font-bold text-blue-600">฿0</span>
-                </div>
-                <div class="bg-white p-4 rounded-2xl flex justify-between items-center border">
-                    <span class="text-sm font-bold">💰 ต้นทุน/รายจ่าย</span><span id="rep-cost" class="font-bold text-red-400">฿0</span>
-                </div>
-            </div>
-            
-            <h3 class="font-bold text-sm mb-4">🏆 พนักงานยอดขายสูงสุด</h3>
-            <div id="staff-report" class="space-y-2 mb-10"></div>
-        </section>
-
-        <!-- 2. SELL (POS) -->
-        <section id="page-sell" class="p-4 block">
-            <div class="mb-4">
-                <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาสินค้า หรือ หมวดหมู่..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
-            </div>
-            <div id="pos-cats" class="flex gap-2 overflow-x-auto pb-4 hide-scroll"></div>
-            <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-32">
-                <div class="col-span-full py-20 text-center text-gray-300 italic">กำลังเชื่อมต่อข้อมูลสินค้า...</div>
-            </div>
-        </section>
-
-        <!-- 3. KITCHEN (KDS) -->
-        <section id="page-kitchen" class="p-4 hidden anim-up">
-            <h2 class="text-xl font-bold mb-6">รายการสั่งอาหาร</h2>
-            <div id="kitchen-list" class="space-y-4"></div>
-        </section>
-
-        <!-- 4. STOCK (Visual Control) -->
-        <section id="page-stock" class="p-4 hidden anim-up">
-            <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-blue-600 p-5 rounded-3xl text-white shadow-lg text-center">
-                    <p class="text-[9px] fo
+                    <
