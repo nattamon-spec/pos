@@ -3,470 +3,282 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เลื่องชื่อลือชา POS | ร่างทอง 100%</title>
+    <title>MuayMoney Clone - Professional POS System</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Kanit', sans-serif; background-color: #fdfbf7; }
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
-        .active-nav { background: #78350f; color: white; box-shadow: 0 10px 15px -3px rgba(120, 53, 15, 0.3); }
+        body { font-family: 'Kanit', sans-serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .product-card:active { transform: scale(0.95); }
     </style>
 </head>
-<body class="text-slate-800">
+<body class="bg-gray-100">
+    <div id="root"></div>
 
-<div id="app" class="flex h-screen overflow-hidden">
-    
-    <!-- Sidebar Navigation (เหมือน MuayMoney) -->
-    <nav class="w-20 md:w-64 bg-white border-r border-amber-100 flex flex-col no-print">
-        <div class="p-6 text-center">
-            <h1 class="hidden md:block text-2xl font-black text-amber-900">เลื่องชื่อลือชา</h1>
-            <div class="md:hidden font-black text-amber-900 text-xl">LC</div>
-        </div>
-        
-        <div class="flex-1 px-4 space-y-2">
-            <button @click="currentTab = 'pos'" :class="['w-full flex items-center gap-3 p-4 rounded-2xl transition-all', currentTab === 'pos' ? 'active-nav' : 'hover:bg-amber-50 text-amber-900/60']">
-                <i data-lucide="layout-grid"></i> <span class="hidden md:block font-bold">หน้าขาย (POS)</span>
-            </button>
-            <button @click="currentTab = 'inventory'" :class="['w-full flex items-center gap-3 p-4 rounded-2xl transition-all', currentTab === 'inventory' ? 'active-nav' : 'hover:bg-amber-50 text-amber-900/60']">
-                <i data-lucide="package"></i> <span class="hidden md:block font-bold">คลังเมนู & สต็อก</span>
-            </button>
-            <button @click="currentTab = 'expenses'" :class="['w-full flex items-center gap-3 p-4 rounded-2xl transition-all', currentTab === 'expenses' ? 'active-nav' : 'hover:bg-amber-50 text-amber-900/60']">
-                <i data-lucide="wallet"></i> <span class="hidden md:block font-bold">บันทึกรายจ่าย</span>
-            </button>
-            <button @click="currentTab = 'settings'" :class="['w-full flex items-center gap-3 p-4 rounded-2xl transition-all', currentTab === 'settings' ? 'active-nav' : 'hover:bg-amber-50 text-amber-900/60']">
-                <i data-lucide="settings"></i> <span class="hidden md:block font-bold">ตั้งค่าระบบ</span>
-            </button>
-        </div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
 
-        <div class="p-4 border-t border-amber-50">
-            <div class="bg-amber-50 p-4 rounded-2xl hidden md:block">
-                <p class="text-xs text-amber-600 font-bold">สถานะระบบ</p>
-                <p class="text-sm font-bold text-amber-900">ร่างทอง 100% (Stable)</p>
-            </div>
-        </div>
-    </nav>
+        // --- Mock Data ---
+        const CATEGORIES = ["ทั้งหมด", "กาแฟ", "ชา", "เบเกอรี่", "อาหาร"];
+        const INITIAL_PRODUCTS = [
+            { id: 1, name: "เอสเพรสโซ่", price: 55, category: "กาแฟ", stock: 50, image: "☕" },
+            { id: 2, name: "อเมริกาโน่", price: 50, category: "กาแฟ", stock: 40, image: "☕" },
+            { id: 3, name: "ลาเต้", price: 65, category: "กาแฟ", stock: 30, image: "🥛" },
+            { id: 4, name: "ชาไทย", price: 45, category: "ชา", stock: 100, image: "🍂" },
+            { id: 5, name: "ชาเขียวมัทฉะ", price: 60, category: "ชา", stock: 20, image: "🍵" },
+            { id: 6, name: "ครัวซองต์", price: 85, category: "เบเกอรี่", stock: 15, image: "🥐" },
+            { id: 7, name: "เค้กช็อกโกแลต", price: 120, category: "เบเกอรี่", stock: 10, image: "🍰" },
+            { id: 8, name: "ข้าวผัดกะเพรา", price: 79, category: "อาหาร", stock: 25, image: "🍳" },
+        ];
 
-    <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col overflow-hidden relative">
-        
-        <!-- 1. หน้าขาย (POS) -->
-        <section v-if="currentTab === 'pos'" class="flex h-full overflow-hidden animate-in fade-in duration-300">
-            <div class="flex-1 p-6 overflow-y-auto custom-scroll">
-                <div class="flex justify-between items-center mb-6">
-                    <div class="relative w-full max-w-md">
-                        <i data-lucide="search" class="absolute left-4 top-3.5 text-gray-400" size="20"></i>
-                        <input v-model="searchQuery" type="text" placeholder="ค้นหาเมนู..." class="w-full pl-12 pr-4 py-3 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-amber-500 outline-none">
-                    </div>
-                </div>
+        function App() {
+            const [products, setProducts] = useState(INITIAL_PRODUCTS);
+            const [cart, setCart] = useState([]);
+            const [category, setCategory] = useState("ทั้งหมด");
+            const [search, setSearch] = useState("");
+            const [isShiftOpen, setIsShiftOpen] = useState(false);
+            const [showPayment, setShowPayment] = useState(false);
+            const [cashReceived, setCashReceived] = useState("");
+            const [shiftData, setShiftData] = useState({ startCash: 0, startTime: null });
 
-                <!-- Categories -->
-                <div class="flex gap-2 mb-6 overflow-x-auto pb-2 no-print">
-                    <button v-for="cat in categories" @click="activeCategory = cat" 
-                        :class="['px-6 py-2 rounded-full font-bold transition-all whitespace-nowrap', activeCategory === cat ? 'bg-amber-600 text-white shadow-lg' : 'bg-white text-amber-900/50 hover:bg-amber-50']">
-                        {{ cat }}
-                    </button>
-                </div>
+            // --- Logic ---
+            const filteredProducts = products.filter(p => 
+                (category === "ทั้งหมด" || p.category === category) &&
+                p.name.toLowerCase().includes(search.toLowerCase())
+            );
 
-                <!-- Product Grid -->
-                <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <div v-for="p in filteredProducts" @click="selectProduct(p)" class="bg-white p-3 rounded-[2rem] shadow-sm hover:shadow-xl transition-all cursor-pointer group border-2 border-transparent hover:border-amber-400">
-                        <div class="aspect-square rounded-[1.5rem] overflow-hidden mb-3 bg-gray-100">
-                            <img :src="p.image || 'https://via.placeholder.com/150'" class="w-full h-full object-cover group-hover:scale-110 transition-transform">
-                        </div>
-                        <h3 class="font-bold text-gray-800 truncate">{{ p.name }}</h3>
-                        <div class="flex justify-between items-center">
-                            <span class="text-amber-600 font-black">{{ p.price }} ฿</span>
-                            <span :class="['text-[10px] px-2 py-1 rounded-lg font-bold', p.stock > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600']">
-                                สต็อก: {{ p.stock }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-            <!-- Cart Sidebar -->
-            <div class="w-96 bg-white border-l border-amber-50 flex flex-col shadow-2xl no-print">
-                <div class="p-6 border-b flex justify-between items-center">
-                    <h2 class="text-xl font-black flex items-center gap-2"><i data-lucide="shopping-basket"></i> ตะกร้า</h2>
-                    <button @click="cart = []" class="text-gray-400 hover:text-red-500"><i data-lucide="refresh-ccw" size="20"></i></button>
-                </div>
-                <div class="flex-1 overflow-y-auto p-4 space-y-3 custom-scroll">
-                    <div v-for="(item, idx) in cart" class="bg-gray-50 p-3 rounded-2xl relative group">
-                        <div class="flex justify-between font-bold text-sm">
-                            <span>{{ item.name }}</span>
-                            <span>{{ item.totalPrice }} ฿</span>
-                        </div>
-                        <div class="text-[10px] text-gray-400">
-                            {{ item.options.join(', ') }}
-                        </div>
-                        <div class="flex items-center justify-between mt-2">
-                            <div class="flex items-center bg-white rounded-lg border">
-                                <button @click="updateCartQty(idx, -1)" class="p-1"><i data-lucide="minus" size="12"></i></button>
-                                <span class="w-8 text-center text-xs">{{ item.qty }}</span>
-                                <button @click="updateCartQty(idx, 1)" class="p-1"><i data-lucide="plus" size="12"></i></button>
-                            </div>
-                            <button @click="cart.splice(idx, 1)" class="text-red-300 hover:text-red-500"><i data-lucide="x" size="16"></i></button>
-                        </div>
-                    </div>
-                </div>
-                <div class="p-6 bg-amber-50 rounded-t-[2.5rem]">
-                    <div class="flex justify-between text-2xl font-black mb-4">
-                        <span>รวม</span>
-                        <span class="text-amber-600">{{ cartTotal }} ฿</span>
-                    </div>
-                    <button @click="showPayment = true" :disabled="cart.length === 0" class="w-full bg-amber-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-amber-700 disabled:bg-gray-300">ชำระเงิน</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- 2. คลังสินค้า & จัดการเมนู -->
-        <section v-if="currentTab === 'inventory'" class="p-8 overflow-y-auto h-full custom-scroll">
-            <div class="flex justify-between items-center mb-8">
-                <h2 class="text-3xl font-black text-amber-900">คลังเมนู & สต็อก</h2>
-                <button @click="openProductModal()" class="bg-amber-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg hover:bg-amber-700">
-                    <i data-lucide="plus-circle"></i> เพิ่มเมนูใหม่
-                </button>
-            </div>
-            
-            <div class="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-amber-50">
-                <table class="w-full text-left">
-                    <thead class="bg-amber-50 text-amber-900 font-bold">
-                        <tr>
-                            <th class="p-6">รูป</th>
-                            <th>ชื่อเมนู</th>
-                            <th>หมวดหมู่</th>
-                            <th>ราคา</th>
-                            <th>คงเหลือ</th>
-                            <th>จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-amber-50">
-                        <tr v-for="p in products" class="hover:bg-amber-50/30 transition-colors">
-                            <td class="p-4"><img :src="p.image" class="w-12 h-12 rounded-xl object-cover"></td>
-                            <td class="font-bold">{{ p.name }}</td>
-                            <td><span class="bg-gray-100 px-3 py-1 rounded-full text-xs">{{ p.category }}</span></td>
-                            <td class="font-bold text-amber-600">{{ p.price }} ฿</td>
-                            <td>
-                                <span :class="['font-bold', p.stock < 10 ? 'text-red-500' : 'text-green-600']">{{ p.stock }}</span>
-                            </td>
-                            <td>
-                                <div class="flex gap-2">
-                                    <button @click="openProductModal(p)" class="p-2 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="edit-3" size="18"></i></button>
-                                    <button @click="deleteProduct(p.id)" class="p-2 bg-red-50 text-red-600 rounded-lg"><i data-lucide="trash-2" size="18"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- 3. บันทึกรายจ่าย -->
-        <section v-if="currentTab === 'expenses'" class="p-8 overflow-y-auto h-full custom-scroll">
-            <div class="flex justify-between items-center mb-8">
-                <h2 class="text-3xl font-black text-amber-900">บันทึกรายจ่าย</h2>
-                <button @click="showExpenseModal = true" class="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg hover:bg-red-600">
-                    <i data-lucide="minus-circle"></i> เพิ่มรายการจ่าย
-                </button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white p-6 rounded-[2rem] shadow-sm border-l-8 border-red-500">
-                    <p class="text-gray-400 font-bold">รายจ่ายวันนี้</p>
-                    <h3 class="text-3xl font-black text-red-600">{{ totalExpenses }} ฿</h3>
-                </div>
-            </div>
-            <div class="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-amber-50">
-                <table class="w-full text-left">
-                    <thead class="bg-red-50 text-red-900 font-bold">
-                        <tr>
-                            <th class="p-6">วันที่</th>
-                            <th>รายการ</th>
-                            <th>หมวดหมู่</th>
-                            <th>จำนวนเงิน</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-amber-50">
-                        <tr v-for="ex in expenses" class="hover:bg-red-50/20">
-                            <td class="p-6 text-sm text-gray-400">{{ ex.date }}</td>
-                            <td class="font-bold">{{ ex.title }}</td>
-                            <td>{{ ex.category }}</td>
-                            <td class="font-bold text-red-600">- {{ ex.amount }} ฿</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- 4. ตั้งค่าระบบ -->
-        <section v-if="currentTab === 'settings'" class="p-8 overflow-y-auto h-full custom-scroll">
-            <h2 class="text-3xl font-black text-amber-900 mb-8">ตั้งค่าระบบ</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-amber-50">
-                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-amber-800"><i data-lucide="tag"></i> จัดการหมวดหมู่</h3>
-                    <div class="flex gap-2 mb-4">
-                        <input v-model="newCat" type="text" placeholder="ชื่อหมวดหมู่..." class="flex-1 p-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-amber-500">
-                        <button @click="addCategory" class="bg-amber-600 text-white px-4 rounded-xl font-bold">เพิ่ม</button>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <span v-for="(cat, i) in categories" class="bg-amber-50 text-amber-700 px-4 py-2 rounded-xl font-bold flex items-center gap-2">
-                            {{ cat }} <i @click="categories.splice(i, 1)" data-lucide="x" size="14" class="cursor-pointer hover:text-red-500"></i>
-                        </span>
-                    </div>
-                </div>
-                
-                <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-amber-50">
-                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-amber-800"><i data-lucide="list-plus"></i> ตัวเลือกเสริม (Topping)</h3>
-                    <div class="flex gap-2 mb-4">
-                        <input v-model="newAddonName" type="text" placeholder="ชื่อ..." class="flex-1 p-3 bg-gray-50 rounded-xl outline-none">
-                        <input v-model.number="newAddonPrice" type="number" placeholder="ราคา" class="w-20 p-3 bg-gray-50 rounded-xl outline-none">
-                        <button @click="addAddon" class="bg-amber-600 text-white px-4 rounded-xl font-bold">เพิ่ม</button>
-                    </div>
-                    <div class="space-y-2">
-                        <div v-for="(a, i) in addons" class="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
-                            <span class="font-bold">{{ a.name }} (+{{ a.price }}฿)</span>
-                            <i @click="addons.splice(i, 1)" data-lucide="trash-2" size="16" class="text-red-400 cursor-pointer"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Modal: เลือกตัวเลือกเสริมก่อนลงตะกร้า -->
-        <div v-if="showOptionModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div class="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl">
-                <h2 class="text-2xl font-black mb-2">{{ selectedProduct.name }}</h2>
-                <p class="text-amber-600 font-bold mb-6">ราคาพื้นฐาน {{ selectedProduct.price }} ฿</p>
-                
-                <div class="space-y-6">
-                    <div>
-                        <p class="font-bold mb-3 text-gray-500">ระดับความหวาน</p>
-                        <div class="grid grid-cols-3 gap-2">
-                            <button v-for="s in ['0%', '50%', '100%']" @click="tempOptions.sweet = s" :class="['py-2 rounded-xl font-bold border-2 transition-all', tempOptions.sweet === s ? 'border-amber-600 bg-amber-50 text-amber-600' : 'border-gray-100']">{{ s }}</button>
-                        </div>
-                    </div>
-                    <div>
-                        <p class="font-bold mb-3 text-gray-500">ตัวเลือกเพิ่มเติม</p>
-                        <div class="space-y-2">
-                            <label v-for="a in addons" class="flex items-center justify-between p-3 bg-gray-50 rounded-2xl cursor-pointer">
-                                <span class="font-bold">{{ a.name }} (+{{ a.price }}฿)</span>
-                                <input type="checkbox" :value="a" v-model="tempOptions.extras" class="w-5 h-5 accent-amber-600">
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4 mt-8">
-                    <button @click="showOptionModal = false" class="py-4 font-bold text-gray-400">ยกเลิก</button>
-                    <button @click="confirmAddToCart" class="bg-amber-600 text-white py-4 rounded-2xl font-bold shadow-lg">เพิ่มลงตะกร้า</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal: เพิ่ม/แก้ไข สินค้า -->
-        <div v-if="showProductModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div class="bg-white w-full max-w-lg rounded-[3rem] p-8 shadow-2xl">
-                <h2 class="text-2xl font-black mb-6">{{ editMode ? 'แก้ไขเมนู' : 'เพิ่มเมนูใหม่' }}</h2>
-                <div class="space-y-4">
-                    <input v-model="formProduct.name" type="text" placeholder="ชื่อเมนู" class="w-full p-4 bg-gray-50 rounded-2xl outline-none border-2 border-transparent focus:border-amber-500">
-                    <div class="grid grid-cols-2 gap-4">
-                        <select v-model="formProduct.category" class="p-4 bg-gray-50 rounded-2xl outline-none">
-                            <option v-for="c in categories" :value="c">{{ c }}</option>
-                        </select>
-                        <input v-model.number="formProduct.price" type="number" placeholder="ราคา" class="p-4 bg-gray-50 rounded-2xl outline-none">
-                    </div>
-                    <input v-model.number="formProduct.stock" type="number" placeholder="จำนวนสต็อกเริ่มต้น" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                    <input v-model="formProduct.image" type="text" placeholder="URL รูปภาพ" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                </div>
-                <div class="grid grid-cols-2 gap-4 mt-8">
-                    <button @click="showProductModal = false" class="py-4 font-bold text-gray-400">ยกเลิก</button>
-                    <button @click="saveProduct" class="bg-amber-600 text-white py-4 rounded-2xl font-bold shadow-lg">บันทึกข้อมูล</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal: ชำระเงิน -->
-        <div v-if="showPayment" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <div class="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl text-center">
-                <h2 class="text-3xl font-black mb-6">รับชำระเงิน</h2>
-                <div class="bg-amber-50 p-6 rounded-[2rem] mb-6">
-                    <p class="text-amber-700 font-bold">ยอดรวมสุทธิ</p>
-                    <h3 class="text-5xl font-black text-amber-600">{{ cartTotal }} ฿</h3>
-                </div>
-                <input v-model.number="cashReceived" type="number" placeholder="รับเงินมา..." class="w-full text-center text-3xl font-black p-6 bg-gray-100 rounded-[2rem] outline-none mb-4 focus:ring-4 focus:ring-amber-500/20">
-                
-                <div v-if="cashReceived >= cartTotal" class="mb-6 animate-bounce">
-                    <p class="text-gray-400 font-bold">เงินทอน</p>
-                    <p class="text-4xl font-black text-green-600">{{ cashReceived - cartTotal }} ฿</p>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <button @click="showPayment = false" class="py-4 font-bold text-gray-400">กลับ</button>
-                    <button @click="completeSale" :disabled="cashReceived < cartTotal" class="bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-lg disabled:bg-gray-200">ยืนยันการขาย</button>
-                </div>
-            </div>
-        </div>
-
-    </main>
-</div>
-
-<script>
-const { createApp, ref, computed, onMounted, watch } = Vue;
-
-createApp({
-    setup() {
-        const currentTab = ref('pos');
-        const searchQuery = ref('');
-        const activeCategory = ref('ทั้งหมด');
-        const cart = ref([]);
-        const showOptionModal = ref(false);
-        const showProductModal = ref(false);
-        const showPayment = ref(false);
-        const editMode = ref(false);
-        
-        // Data States
-        const categories = ref(['ทั้งหมด', 'เมนูชา', 'เมนูกาแฟ', 'นมสด', 'โซดา']);
-        const addons = ref([
-            { name: 'ไข่มุก', price: 10 },
-            { name: 'เจลลี่บุก', price: 15 },
-            { name: 'วิปครีม', price: 20 }
-        ]);
-        const products = ref([
-            { id: 1, name: 'ชาไทยเลื่องชื่อ', price: 45, category: 'เมนูชา', stock: 50, image: 'https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?w=400' },
-            { id: 2, name: 'กาแฟลือชา', price: 60, category: 'เมนูกาแฟ', stock: 30, image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400' }
-        ]);
-        const expenses = ref([]);
-
-        // Form States
-        const selectedProduct = ref(null);
-        const tempOptions = ref({ sweet: '100%', extras: [] });
-        const formProduct = ref({ name: '', price: 0, category: 'เมนูชา', stock: 0, image: '' });
-        const cashReceived = ref(null);
-        const newCat = ref('');
-        const newAddonName = ref('');
-        const newAddonPrice = ref(0);
-
-        // Persistence
-        onMounted(() => {
-            const data = ['products', 'categories', 'addons', 'expenses'];
-            data.forEach(key => {
-                const saved = localStorage.getItem(`lc_${key}`);
-                if (saved) window[key].value = JSON.parse(saved);
-            });
-            lucide.createIcons();
-        });
-
-        watch([products, categories, addons, expenses], () => {
-            localStorage.setItem('lc_products', JSON.stringify(products.value));
-            localStorage.setItem('lc_categories', JSON.stringify(categories.value));
-            localStorage.setItem('lc_addons', JSON.stringify(addons.value));
-            localStorage.setItem('lc_expenses', JSON.stringify(expenses.value));
-            setTimeout(() => lucide.createIcons(), 10);
-        }, { deep: true });
-
-        // POS Logic
-        const filteredProducts = computed(() => {
-            return products.value.filter(p => {
-                const mCat = activeCategory.value === 'ทั้งหมด' || p.category === activeCategory.value;
-                const mSearch = p.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-                return mCat && mSearch;
-            });
-        });
-
-        const selectProduct = (p) => {
-            if (p.stock <= 0) return alert('สินค้าหมด!');
-            selectedProduct.value = p;
-            tempOptions.value = { sweet: '100%', extras: [] };
-            showOptionModal.value = true;
-        };
-
-        const confirmAddToCart = () => {
-            const extraPrice = tempOptions.value.extras.reduce((sum, a) => sum + a.price, 0);
-            const item = {
-                id: selectedProduct.value.id,
-                name: selectedProduct.value.name,
-                basePrice: selectedProduct.value.price,
-                totalPrice: selectedProduct.value.price + extraPrice,
-                qty: 1,
-                options: [tempOptions.value.sweet, ...tempOptions.value.extras.map(e => e.name)]
+            const addToCart = (product) => {
+                if (!isShiftOpen) return alert("กรุณาเปิดกะก่อนเริ่มการขาย");
+                const existing = cart.find(item => item.id === product.id);
+                if (existing) {
+                    setCart(cart.map(item => item.id === product.id ? {...item, quantity: item.quantity + 1} : item));
+                } else {
+                    setCart([...cart, { ...product, quantity: 1 }]);
+                }
             };
-            cart.value.push(item);
-            showOptionModal.value = false;
-        };
 
-        const cartTotal = computed(() => cart.value.reduce((sum, i) => sum + (i.totalPrice * i.qty), 0));
+            const updateQty = (id, delta) => {
+                setCart(cart.map(item => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item));
+            };
 
-        const updateCartQty = (idx, delta) => {
-            cart.value[idx].qty += delta;
-            if (cart.value[idx].qty <= 0) cart.value.splice(idx, 1);
-        };
+            const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id));
 
-        const completeSale = () => {
-            cart.value.forEach(item => {
-                const p = products.value.find(prod => prod.id === item.id);
-                if (p) p.stock -= item.qty;
-            });
-            alert('ขายสำเร็จ! พิมพ์ใบเสร็จเรียบร้อย');
-            cart.value = [];
-            showPayment.value = false;
-            cashReceived.value = null;
-        };
+            const handlePayment = (type) => {
+                if (type === 'CASH' && parseFloat(cashReceived) < subtotal) return alert("เงินสดไม่พอ");
+                
+                // ตัดสต็อก (Simulate)
+                const newProducts = products.map(p => {
+                    const cartItem = cart.find(c => c.id === p.id);
+                    return cartItem ? { ...p, stock: p.stock - cartItem.quantity } : p;
+                });
+                
+                setProducts(newProducts);
+                alert("ชำระเงินสำเร็จ! กำลังพิมพ์ใบเสร็จ...");
+                setCart([]);
+                setShowPayment(false);
+                setCashReceived("");
+            };
 
-        // Inventory Logic
-        const openProductModal = (p = null) => {
-            if (p) {
-                editMode.value = true;
-                formProduct.value = { ...p };
-            } else {
-                editMode.value = false;
-                formProduct.value = { id: Date.now(), name: '', price: 0, category: 'เมนูชา', stock: 0, image: '' };
-            }
-            showProductModal.value = true;
-        };
+            // --- UI Components ---
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {/* Sidebar */}
+                    <div className="w-20 bg-blue-900 text-white flex flex-col items-center py-6 space-y-8">
+                        <div className="text-2xl font-bold">M</div>
+                        <i className="fa-solid fa-shop text-xl cursor-pointer text-blue-300"></i>
+                        <i className="fa-solid fa-box text-xl cursor-pointer hover:text-blue-300"></i>
+                        <i className="fa-solid fa-chart-line text-xl cursor-pointer hover:text-blue-300"></i>
+                        <i className="fa-solid fa-gear text-xl cursor-pointer hover:text-blue-300"></i>
+                    </div>
 
-        const saveProduct = () => {
-            if (editMode.value) {
-                const idx = products.value.findIndex(p => p.id === formProduct.value.id);
-                products.value[idx] = { ...formProduct.value };
-            } else {
-                products.value.push({ ...formProduct.value });
-            }
-            showProductModal.value = false;
-        };
+                    {/* Main Content */}
+                    <div className="flex-1 flex flex-col bg-gray-100">
+                        {/* Header */}
+                        <div className="h-16 bg-white border-b px-6 flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <h1 className="text-xl font-bold text-gray-800">MuayMoney POS</h1>
+                                <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">
+                                    {isShiftOpen ? "● กะเปิดอยู่" : "○ กะปิด"}
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                                {!isShiftOpen ? (
+                                    <button onClick={() => {setIsShiftOpen(true); setShiftData({startCash: 1000, startTime: new Date()})}} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">เปิดกะ</button>
+                                ) : (
+                                    <button onClick={() => setIsShiftOpen(false)} className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium">ปิดกะ</button>
+                                )}
+                                <div className="text-right">
+                                    <p className="text-sm font-bold">Admin User</p>
+                                    <p className="text-xs text-gray-500">สาขาหลัก</p>
+                                </div>
+                            </div>
+                        </div>
 
-        const deleteProduct = (id) => {
-            if (confirm('ยืนยันการลบเมนูนี้?')) {
-                products.value = products.value.filter(p => p.id !== id);
-            }
-        };
+                        {/* POS Area */}
+                        <div className="flex-1 flex overflow-hidden">
+                            {/* Product Section */}
+                            <div className="flex-1 p-4 flex flex-col">
+                                <div className="flex space-x-2 mb-4 overflow-x-auto hide-scrollbar">
+                                    {CATEGORIES.map(cat => (
+                                        <button 
+                                            key={cat}
+                                            onClick={() => setCategory(cat)}
+                                            className={`px-6 py-2 rounded-full whitespace-nowrap font-medium transition ${category === cat ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-200'}`}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <div className="mb-4 relative">
+                                    <i className="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-400"></i>
+                                    <input 
+                                        type="text" 
+                                        placeholder="ค้นหาสินค้า หรือ ยิงบาร์โค้ด..." 
+                                        className="w-full pl-12 pr-4 py-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                    />
+                                </div>
 
-        // Settings Logic
-        const addCategory = () => {
-            if (newCat.value) {
-                categories.value.push(newCat.value);
-                newCat.value = '';
-            }
-        };
+                                <div className="flex-1 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-10">
+                                    {filteredProducts.map(product => (
+                                        <div 
+                                            key={product.id}
+                                            onClick={() => addToCart(product)}
+                                            className="product-card bg-white p-4 rounded-2xl shadow-sm hover:shadow-md cursor-pointer transition-all border-2 border-transparent hover:border-blue-500 relative overflow-hidden"
+                                        >
+                                            <div className="text-4xl mb-2">{product.image}</div>
+                                            <h3 className="font-bold text-gray-800 truncate">{product.name}</h3>
+                                            <p className="text-blue-600 font-bold text-lg">฿{product.price}</p>
+                                            <div className="absolute top-2 right-2 bg-gray-100 px-2 py-1 rounded text-[10px] text-gray-500">
+                                                คงเหลือ: {product.stock}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
 
-        const addAddon = () => {
-            if (newAddonName.value) {
-                addons.value.push({ name: newAddonName.value, price: newAddonPrice.value });
-                newAddonName.value = '';
-                newAddonPrice.value = 0;
-            }
-        };
+                            {/* Cart Section */}
+                            <div className="w-96 bg-white border-l flex flex-col">
+                                <div className="p-4 border-b flex justify-between items-center">
+                                    <h2 className="font-bold text-lg"><i className="fa-solid fa-cart-shopping mr-2"></i>รายการสั่งซื้อ</h2>
+                                    <button onClick={() => setCart([])} className="text-gray-400 hover:text-red-500"><i className="fa-solid fa-trash-can"></i></button>
+                                </div>
 
-        return {
-            currentTab, searchQuery, activeCategory, categories, products, cart,
-            filteredProducts, selectProduct, showOptionModal, selectedProduct, tempOptions,
-            confirmAddToCart, cartTotal, updateCartQty, showPayment, cashReceived, completeSale,
-            showProductModal, editMode, formProduct, openProductModal, saveProduct, deleteProduct,
-            expenses, addons, newCat, addCategory, newAddonName, newAddonPrice, addAddon
-        };
-    }
-}).mount('#app');
-</script>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                    {cart.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                                            <i className="fa-solid fa-basket-shopping text-5xl mb-2"></i>
+                                            <p>ไม่มีสินค้าในตะกร้า</p>
+                                        </div>
+                                    ) : (
+                                        cart.map(item => (
+                                            <div key={item.id} className="flex justify-between items-center">
+                                                <div className="flex-1">
+                                                    <p className="font-medium text-sm">{item.name}</p>
+                                                    <p className="text-blue-600 text-xs font-bold">฿{item.price * item.quantity}</p>
+                                                </div>
+                                                <div className="flex items-center space-x-3 bg-gray-100 rounded-lg p-1">
+                                                    <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 bg-white rounded shadow-sm text-xs">-</button>
+                                                    <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
+                                                    <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 bg-white rounded shadow-sm text-xs">+</button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <div className="p-6 bg-gray-50 border-t space-y-4">
+                                    <div className="flex justify-between text-sm text-gray-600">
+                                        <span>ยอดรวม</span>
+                                        <span>฿{subtotal}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm text-gray-600">
+                                        <span>ภาษี (7%)</span>
+                                        <span>฿{(subtotal * 0.07).toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-2xl font-black text-gray-800">
+                                        <span>รวมทั้งสิ้น</span>
+                                        <span className="text-blue-600">฿{subtotal.toLocaleString()}</span>
+                                    </div>
+                                    <button 
+                                        disabled={cart.length === 0}
+                                        onClick={() => setShowPayment(true)}
+                                        className={`w-full py-4 rounded-2xl font-bold text-lg shadow-lg transition ${cart.length === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'}`}
+                                    >
+                                        ชำระเงิน
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Payment Modal */}
+                    {showPayment && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl">
+                                <div className="p-6 border-b flex justify-between items-center">
+                                    <h3 className="text-xl font-bold">ชำระเงิน</h3>
+                                    <button onClick={() => setShowPayment(false)} className="text-gray-400 text-2xl">&times;</button>
+                                </div>
+                                <div className="p-6 space-y-6">
+                                    <div className="text-center">
+                                        <p className="text-gray-500">ยอดชำระทั้งหมด</p>
+                                        <p className="text-5xl font-black text-blue-600">฿{subtotal.toLocaleString()}</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <button className="flex flex-col items-center p-4 border-2 border-blue-600 rounded-2xl bg-blue-50">
+                                            <i className="fa-solid fa-money-bill-wave text-2xl text-blue-600 mb-2"></i>
+                                            <span className="font-bold">เงินสด</span>
+                                        </button>
+                                        <button className="flex flex-col items-center p-4 border-2 border-gray-100 rounded-2xl hover:border-blue-600 transition">
+                                            <i className="fa-solid fa-qrcode text-2xl text-gray-600 mb-2"></i>
+                                            <span className="font-bold">PromptPay</span>
+                                        </button>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">รับเงินสดมา</label>
+                                        <input 
+                                            type="number" 
+                                            className="w-full text-3xl font-bold p-4 bg-gray-100 rounded-2xl border-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="0.00"
+                                            value={cashReceived}
+                                            onChange={(e) => setCashReceived(e.target.value)}
+                                        />
+                                    </div>
+
+                                    {parseFloat(cashReceived) >= subtotal && (
+                                        <div className="bg-green-50 p-4 rounded-2xl flex justify-between items-center">
+                                            <span className="text-green-700 font-bold">เงินทอน</span>
+                                            <span className="text-2xl font-black text-green-700">฿{(parseFloat(cashReceived) - subtotal).toLocaleString()}</span>
+                                        </div>
+                                    )}
+
+                                    <button 
+                                        onClick={() => handlePayment('CASH')}
+                                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-xl shadow-lg hover:bg-blue-700"
+                                    >
+                                        ยืนยันการชำระเงิน
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
