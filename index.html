@@ -3,62 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>เลื่องชื่อลือชา POS Pro</title>
-    <!-- Firebase SDK -->
+    <title>เลื่องชื่อลือชา POS Enterprise</title>
+    <!-- Firebase SDK 8.10.1 -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root { --p-blue: #007AFF; --bg-cream: #FDFBF7; }
+        :root { --p-blue: #007AFF; --bg-cream: #FDFBF7; --soft-blue: #E3F2FD; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg-cream); color: #334155; touch-action: manipulation; }
         .btn-touch { transition: all 0.1s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .btn-touch:active { transform: scale(0.95); background-color: #E3F2FD; }
+        .btn-touch:active { transform: scale(0.95); background-color: var(--soft-blue); }
         .tab-active { color: var(--p-blue) !important; border-top: 4px solid var(--p-blue); font-weight: 600; }
-        .mod-selected { border: 3px solid var(--p-blue) !important; background-color: #E3F2FD !important; }
+        .mod-selected { border: 3px solid var(--p-blue) !important; background-color: var(--soft-blue) !important; }
         .hide-scroll::-webkit-scrollbar { display: none; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .anim-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
     </style>
 </head>
 <body class="pb-28">
 
     <!-- HEADER -->
     <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-blue-50 shadow-sm">
-        <h1 class="text-xl font-bold text-[#004A99] uppercase tracking-tighter">เลื่องชื่อลือชา</h1>
-        <div id="db-status" class="text-[9px] px-2 py-1 rounded-full font-bold bg-green-50 text-green-500 uppercase">● ออนไลน์</div>
+        <h1 class="text-xl font-bold text-[#004A99] uppercase tracking-tighter italic">เลื่องชื่อลือชา</h1>
+        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-600 uppercase">● เชื่อมต่อแล้ว</div>
     </header>
 
-    <!-- CONTENT AREA -->
     <div id="main-content">
-        <!-- 1. SELL (POS) -->
+        <!-- 1. SELL PAGE (POS) -->
         <section id="page-sell" class="p-4 block">
-            <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-center">
-                <div class="text-5xl mb-4">🍚</div>
-                <h2 class="text-xl font-bold text-gray-400 mb-6">ยังไม่มีข้อมูลสินค้าในระบบ</h2>
-                <button onclick="seedInitialData()" class="bg-blue-600 text-white px-10 py-4 rounded-[2rem] font-bold shadow-lg btn-touch">✨ กดตรงนี้เพื่อเริ่มระบบ</button>
+            <div class="mb-4">
+                <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนูสินค้า..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
             </div>
-            
-            <div id="pos-ui" class="hidden">
-                <div class="mb-4">
-                    <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนู..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
-                </div>
-                <div id="pos-cats" class="flex gap-2 overflow-x-auto pb-4 hide-scroll mb-2"></div>
-                <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-32"></div>
-            </div>
+            <div id="pos-cats" class="flex gap-2 overflow-x-auto pb-4 hide-scroll mb-2"></div>
+            <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-32"></div>
         </section>
 
         <!-- 2. REPORT -->
-        <section id="page-report" class="p-4 hidden">
-            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
+        <section id="page-report" class="p-4 hidden anim-up">
+            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
                 <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">ยอดขายวันนี้</p>
-                <h2 id="rep-total" class="text-5xl font-bold text-blue-600 tracking-tighter">฿0</h2>
+                <h2 id="rep-total" class="text-5xl font-bold text-blue-600 tracking-tighter font-mono">฿0</h2>
             </div>
-            <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-green-50 p-4 rounded-3xl border border-green-100 text-center">
+            <div class="grid grid-cols-2 gap-3 mb-6 text-center">
+                <div class="bg-green-50 p-5 rounded-3xl border border-green-100">
                     <p class="text-[9px] text-green-600 font-bold uppercase">กำไรสุทธิ</p>
                     <p id="rep-profit" class="text-xl font-bold text-green-700">฿0</p>
                 </div>
-                <div class="bg-orange-50 p-4 rounded-3xl border border-orange-100 text-center">
+                <div class="bg-orange-50 p-5 rounded-3xl border border-orange-100">
                     <p class="text-[9px] text-orange-600 font-bold uppercase">ภาษี 7%</p>
                     <p id="rep-tax" class="text-xl font-bold text-orange-700">฿0</p>
                 </div>
@@ -68,28 +61,28 @@
         </section>
 
         <!-- 3. KITCHEN -->
-        <section id="page-kitchen" class="p-4 hidden">
-            <h2 class="text-xl font-bold mb-6 italic uppercase">ห้องครัว</h2>
+        <section id="page-kitchen" class="p-4 hidden anim-up">
+            <h2 class="text-xl font-bold mb-6">ห้องครัว (Order)</h2>
             <div id="kitchen-list" class="space-y-4"></div>
         </section>
 
         <!-- 4. STOCK -->
-        <section id="page-stock" class="p-4 hidden">
+        <section id="page-stock" class="p-4 hidden anim-up">
             <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-blue-600 p-5 rounded-3xl text-white shadow-lg text-center">
-                    <p class="text-[9px] font-bold uppercase opacity-70">สินค้า</p>
-                    <p id="stk-count" class="text-3xl font-bold">0</p>
+                <div class="bg-blue-600 p-5 rounded-3xl text-white shadow-lg text-center font-bold">
+                    <p class="text-[9px] uppercase opacity-70">สินค้า</p>
+                    <p id="stk-count">0</p>
                 </div>
-                <div class="bg-white p-5 rounded-3xl border border-blue-50 text-blue-600 text-center shadow-sm">
-                    <p class="text-[9px] font-bold uppercase opacity-50">มูลค่าคลัง</p>
-                    <p id="stk-value" class="text-2xl font-bold tracking-tighter font-mono">฿0</p>
+                <div class="bg-white p-5 rounded-3xl border border-blue-50 text-blue-600 text-center font-bold">
+                    <p class="text-[9px] uppercase opacity-50">มูลค่าคลัง</p>
+                    <p id="stk-value">฿0</p>
                 </div>
             </div>
             <div class="flex justify-between items-center mb-6 px-2">
-                <h3 class="font-bold">จัดการเมนู</h3>
-                <button onclick="openProductModal()" class="btn-touch bg-blue-600 text-white px-6 py-2.5 rounded-2xl text-xs font-bold shadow-md">+ เพิ่มเมนู</button>
+                <h3 class="font-bold">คลังสินค้า</h3>
+                <button onclick="openProductModal()" class="btn-touch bg-blue-600 text-white px-6 py-2.5 rounded-2xl text-xs font-bold">+ เพิ่มสินค้า</button>
             </div>
-            <div id="admin-list" class="space-y-3 mb-10"></div>
+            <div id="admin-list" class="space-y-3"></div>
         </section>
     </div>
 
@@ -99,11 +92,11 @@
             <div id="cart-qty" class="bg-blue-600 text-white w-9 h-9 flex items-center justify-center rounded-full text-sm font-bold">0</div>
             <div id="cart-total" class="text-2xl font-bold text-[#004A99] tracking-tighter">฿0</div>
         </div>
-        <button onclick="openCheckout()" class="btn-touch bg-blue-600 text-white px-10 py-3 rounded-2xl font-bold text-sm uppercase">ชำระเงิน</button>
+        <button onclick="openCheckout()" class="btn-touch bg-blue-600 text-white px-10 py-3.5 rounded-2xl font-bold text-sm uppercase">ชำระเงิน</button>
     </div>
 
-    <!-- BOTTOM TAB NAVIGATION -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-50 flex justify-around p-3 pb-8 z-50 shadow-2xl">
+    <!-- BOTTOM TABS -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-50 flex justify-around p-3 pb-8 z-50">
         <button onclick="showPage('report')" id="nav-report" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
             <span class="text-xl">📊</span><span class="text-[9px] font-bold uppercase">Report</span>
         </button>
@@ -120,4 +113,12 @@
     </nav>
 
     <!-- MODAL: MODIFIERS -->
-    <div id="mod-modal" class="fixed inset-0
+    <div id="mod-modal" class="fixed inset-0 bg-black/60 hidden z-[100] flex items-end">
+        <div class="bg-white w-full rounded-t-[3rem] p-8 max-h-[85vh] overflow-y-auto anim-up">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
+            <h3 id="mod-p-name" class="text-2xl font-bold mb-1 tracking-tight">เมนูสินค้า</h3>
+            <p id="mod-p-price" class="text-blue-600 font-bold mb-8">ราคาปกติ ฿0</p>
+            <div id="mod-list-container" class="space-y-6"></div>
+            <div class="flex justify-between items-center sticky bottom-0 bg-white pt-6 border-t mt-8">
+                <p id="mod-total" class="text-4xl font-bold text-red-600">฿0</p>
+                <button onclick="confirmModAdd()" class="bg-blue-600 text-white px-12 py-5 rounded-[2.5rem] font-bold shadow-xl">เลือกเ
