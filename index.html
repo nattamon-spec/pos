@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>เลื่องชื่อลือชา POS - Enterprise</title>
-    <!-- Firebase SDK 8.10.1 -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -14,9 +14,9 @@
         :root { --p-blue: #007AFF; --bg-cream: #FDFBF7; --soft-blue: #E3F2FD; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg-cream); color: #334155; touch-action: manipulation; }
         
-        /* Visual Feedback - จิ้มแล้วแรเงาสีฟ้า */
-        .btn-touch { transition: all 0.1s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .btn-touch:active { transform: scale(0.95); background-color: var(--soft-blue); filter: brightness(0.9); }
+        /* ปุ่มจิ้มแล้วมีแรเงาสีฟ้า */
+        .btn-touch { transition: all 0.1s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; outline: none; }
+        .btn-touch:active { transform: scale(0.96); background-color: var(--soft-blue); filter: brightness(0.95); }
         .card-active:active { background-color: var(--soft-blue); border-color: var(--p-blue); }
 
         .tab-active { color: var(--p-blue) !important; border-top: 4px solid var(--p-blue); font-weight: 600; }
@@ -31,44 +31,173 @@
 
     <!-- HEADER -->
     <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-blue-50 shadow-sm">
-        <h1 class="text-xl font-bold text-[#004A99] uppercase tracking-tighter italic">เลื่องชื่อลือชา</h1>
-        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-600 uppercase tracking-widest italic">● ระบบออนไลน์</div>
+        <h1 class="text-xl font-bold text-[#004A99] tracking-tighter uppercase italic">เลื่องชื่อลือชา</h1>
+        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-600 uppercase tracking-widest">ระบบออนไลน์</div>
     </header>
 
     <div id="main-content">
-        <!-- 1. SELL PAGE (POS) -->
-        <section id="page-sell" class="p-4 block anim-up">
+        <!-- 1. SELL PAGE (หน้าแรก) -->
+        <section id="page-sell" class="p-4 block">
             <div class="mb-4">
-                <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนูสินค้า..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
+                <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนูสินค้า..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50 text-sm">
             </div>
             <div id="pos-cats" class="flex gap-2 overflow-x-auto pb-4 hide-scroll mb-2"></div>
             <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-32">
-                <div class="col-span-full py-20 text-center text-gray-300 italic">กำลังเชื่อมต่อข้อมูล...</div>
+                <div class="col-span-full py-20 text-center text-gray-300 italic">กำลังเชื่อมข้อมูล...</div>
             </div>
         </section>
 
-        <!-- 2. REPORT (Advanced Analytics) -->
+        <!-- 2. REPORT PAGE -->
         <section id="page-report" class="p-4 hidden anim-up">
-            <div class="flex gap-2 overflow-x-auto pb-4 hide-scroll">
-                <button onclick="updateStats('today')" class="range-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold shadow-sm">วันนี้</button>
-                <button onclick="updateStats('7days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
-                <button onclick="updateStats('30days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
+            <div class="flex gap-2 overflow-x-auto pb-4 hide-scroll mb-2">
+                <button onclick="setRepRange('today')" class="range-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold">วันนี้</button>
+                <button onclick="setRepRange('7days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
+                <button onclick="setRepRange('30days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
             </div>
-
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-4 text-center">
                 <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">ยอดขายสุทธิ</p>
                 <h2 id="rep-total" class="text-5xl font-bold text-blue-600 tracking-tighter">฿0</h2>
             </div>
-
-            <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-green-50 p-5 rounded-3xl border border-green-100 text-center">
-                    <p class="text-[9px] text-green-600 font-bold uppercase">กำไรสุทธิ</p>
-                    <p id="rep-profit" class="text-xl font-bold text-green-700 font-mono">฿0</p>
-                </div>
-                <div class="bg-orange-50 p-5 rounded-3xl border border-orange-100 text-center">
-                    <p class="text-[9px] text-orange-600 font-bold uppercase">ภาษี 7%</p>
-                    <p id="rep-tax" class="text-xl font-bold text-orange-700 font-mono">฿0</p>
-                </div>
+            <div class="grid grid-cols-2 gap-3 mb-6 text-center">
+                <div class="bg-green-50 p-4 rounded-3xl border border-green-100"><p class="text-[9px] text-green-600 font-bold uppercase">กำไร</p><p id="rep-profit" class="text-xl font-bold text-green-700">฿0</p></div>
+                <div class="bg-orange-50 p-4 rounded-3xl border border-orange-100"><p class="text-[9px] text-orange-600 font-bold uppercase">ภาษี 7%</p><p id="rep-tax" class="text-xl font-bold text-orange-700">฿0</p></div>
             </div>
+            <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-blue-50 mb-6"><canvas id="salesChart"></canvas></div>
+            <h3 class="font-bold text-sm mb-4">🏆 สินค้าขายดี</h3>
+            <div id="top-products" class="space-y-2 mb-10"></div>
+        </section>
 
-            <div cl
+        <!-- 3. KITCHEN PAGE -->
+        <section id="page-kitchen" class="p-4 hidden anim-up">
+            <h2 class="text-xl font-bold mb-6 italic uppercase">ห้องครัว</h2>
+            <div id="kitchen-list" class="space-y-4"></div>
+        </section>
+
+        <!-- 4. STOCK PAGE -->
+        <section id="page-stock" class="p-4 hidden anim-up">
+            <div class="grid grid-cols-2 gap-3 mb-6 text-center">
+                <div class="bg-blue-600 p-5 rounded-3xl text-white shadow-lg"><p class="text-[9px] uppercase font-bold opacity-70">สินค้า</p><p id="stk-count" class="text-3xl font-bold">0</p></div>
+                <div class="bg-white p-5 rounded-3xl border border-blue-50 text-blue-600 shadow-sm"><p class="text-[9px] uppercase font-bold opacity-50">มูลค่าคลัง</p><p id="stk-value" class="text-2xl font-bold font-mono">฿0</p></div>
+            </div>
+            <div class="flex justify-between items-center mb-6 px-2">
+                <h3 class="font-bold">จัดการเมนู</h3>
+                <button onclick="openProductModal()" class="btn-touch bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md">+ เพิ่มสินค้า</button>
+            </div>
+            <div id="admin-list" class="space-y-3 mb-10"></div>
+            <button onclick="seedInitialData()" class="w-full py-4 text-gray-300 text-[10px] font-bold uppercase italic border-2 border-dashed rounded-3xl">✨ ติดตั้งระบบเริ่มต้น</button>
+        </section>
+    </div>
+
+    <!-- CART BOTTOM BAR -->
+    <div id="cart-bar" class="fixed bottom-24 left-4 right-4 bg-white p-5 rounded-[2.5rem] shadow-2xl flex justify-between items-center hidden z-40 border border-blue-50 animate-bounce">
+        <div class="flex items-center gap-4">
+            <div id="cart-qty" class="bg-blue-600 text-white w-9 h-9 flex items-center justify-center rounded-full text-sm font-bold font-mono">0</div>
+            <div id="cart-total" class="text-2xl font-bold text-[#004A99] tracking-tighter">฿0</div>
+        </div>
+        <button onclick="openCheckout()" class="btn-touch bg-blue-600 text-white px-10 py-3.5 rounded-2xl font-bold text-sm uppercase">ชำระเงิน</button>
+    </div>
+
+    <!-- BOTTOM TAB NAVIGATION -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-50 flex justify-around p-3 pb-8 z-50 shadow-2xl">
+        <button onclick="showPage('report')" id="nav-report" class="flex flex-col items-center gap-1 text-gray-300 btn-touch"><span class="text-xl">📊</span><span class="text-[9px] font-bold uppercase">Report</span></button>
+        <button onclick="showPage('sell')" id="nav-sell" class="flex flex-col items-center gap-1 text-gray-300 tab-active btn-touch"><span class="text-xl">🛒</span><span class="text-[9px] font-bold uppercase">Sell</span></button>
+        <button onclick="showPage('kitchen')" id="nav-kitchen" class="flex flex-col items-center gap-1 text-gray-300 relative btn-touch"><span class="text-xl">👨‍🍳</span><span id="k-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1.5 rounded-full hidden">0</span><span class="text-[9px] font-bold uppercase">Kitchen</span></button>
+        <button onclick="showPage('stock')" id="nav-stock" class="flex flex-col items-center gap-1 text-gray-300 btn-touch"><span class="text-xl">📦</span><span class="text-[9px] font-bold uppercase">Stock</span></button>
+    </nav>
+
+    <!-- MODAL: MODIFIERS (Loyverse Style) -->
+    <div id="mod-modal" class="fixed inset-0 bg-black/60 hidden z-[100] flex items-end">
+        <div class="bg-white w-full rounded-t-[3rem] p-8 max-h-[85vh] overflow-y-auto anim-up">
+            <h3 id="mod-p-name" class="text-2xl font-bold mb-1 italic">ชื่อเมนู</h3>
+            <p id="mod-p-price" class="text-blue-600 font-bold mb-6">฿0</p>
+            <div id="mod-list-container" class="space-y-6"></div>
+            <div class="flex justify-between items-center sticky bottom-0 bg-white pt-6 border-t mt-8">
+                <p id="mod-total" class="text-3xl font-bold text-red-600">฿0</p>
+                <button onclick="confirmModAdd()" class="bg-blue-600 text-white px-12 py-4 rounded-[2rem] font-bold shadow-lg btn-touch">เลือกรายการ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADMIN PRODUCT -->
+    <div id="admin-modal" class="fixed inset-0 bg-black/60 hidden z-[110] flex items-center justify-center p-6">
+        <div class="bg-white w-full max-w-md rounded-[3rem] p-10 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <h2 class="text-2xl font-bold mb-8">ข้อมูลสินค้า</h2>
+            <div class="space-y-4">
+                <div class="flex flex-col items-center">
+                    <img id="admin-preview" class="w-36 h-36 rounded-3xl object-cover bg-gray-50 border shadow-sm mb-3">
+                    <label class="bg-blue-50 text-blue-600 text-[10px] font-bold px-6 py-2.5 rounded-full cursor-pointer uppercase border border-blue-100 btn-touch">+ เลือกรูปภาพ<input type="file" id="img-input" accept="image/*" class="hidden" onchange="previewImg(event)"></label>
+                </div>
+                <input type="text" id="adm-name" placeholder="ชื่อสินค้า" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
+                <div class="grid grid-cols-2 gap-3"><input type="number" id="adm-price" placeholder="ราคาขาย" class="p-4 bg-gray-50 rounded-2xl font-bold"><input type="number" id="adm-cost" placeholder="ต้นทุน" class="p-4 bg-gray-50 rounded-2xl text-gray-400"></div>
+                <div class="grid grid-cols-2 gap-3"><input type="number" id="adm-stock" placeholder="สต็อก" class="p-4 bg-gray-50 rounded-2xl"><input type="text" id="adm-cat" placeholder="หมวดหมู่" class="w-full p-4 bg-gray-50 rounded-2xl"></div>
+                <div class="bg-blue-50 p-5 rounded-3xl"><p class="text-[10px] font-bold text-blue-400 mb-2 uppercase">ตัวเลือกเสริม (เช่น พิเศษ:10, ไข่ดาว:10)</p><input type="text" id="adm-mods" placeholder="ชื่อ:ราคา, ชื่อ:ราคา" class="w-full p-3 bg-white rounded-xl text-xs border-none shadow-sm"></div>
+                <div class="flex gap-3 pt-2"><button onclick="closeAdminModal()" class="flex-1 font-bold text-gray-400 py-4 uppercase text-xs">ปิด</button><button onclick="saveProduct()" class="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg btn-touch uppercase text-xs">บันทึก</button></div>
+                <button onclick="deleteProduct()" id="btn-del" class="w-full text-red-300 text-[10px] uppercase hidden py-2 underline italic">ลบรายการนี้</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CHECKOUT -->
+    <div id="pay-modal" class="fixed inset-0 bg-black/80 hidden z-[120] flex items-end">
+        <div class="bg-white w-full rounded-t-[4rem] p-10 pb-16 shadow-2xl anim-up">
+            <h2 id="pay-display" class="text-7xl font-bold text-blue-600 text-center mb-10 tracking-tighter">฿0</h2>
+            <div class="grid grid-cols-3 gap-3 mb-10 text-center">
+                <button onclick="setMethod('Cash')" id="m-Cash" class="btn-touch p-5 bg-blue-50 border-2 border-blue-600 rounded-3xl flex flex-col items-center"><span class="text-2xl mb-1">💵</span><span class="text-[9px] font-bold uppercase">Cash</span></button>
+                <button onclick="setMethod('Transfer')" id="m-Transfer" class="btn-touch p-5 bg-gray-50 border-2 border-transparent rounded-3xl flex flex-col items-center"><span class="text-2xl mb-1">📱</span><span class="text-[9px] font-bold uppercase">KBank</span></button>
+                <button onclick="setMethod('ThaiPlus')" id="m-ThaiPlus" class="btn-touch p-5 bg-gray-50 border-2 border-transparent rounded-3xl flex flex-col items-center"><span class="text-2xl mb-1">💎</span><span class="text-[9px] font-bold uppercase">ThaiPlus</span></button>
+            </div>
+            <div id="box-Cash" class="mb-10 text-center"><input type="number" id="cash-in" oninput="calcChange()" placeholder="รับเงินมา..." class="w-full p-8 bg-blue-50 rounded-[3rem] text-5xl text-center font-bold text-blue-600 outline-none"><p class="text-center mt-6 font-bold text-xl text-gray-400 uppercase">เงินทอน: <span id="change-txt" class="text-green-600 text-4xl font-mono">฿0</span></p></div>
+            <div id="box-Transfer" class="hidden flex flex-col items-center mb-10"><div class="bg-white p-4 rounded-[3rem] border-2 border-blue-50 mb-4 shadow-sm"><img id="qr-img" class="w-64 h-64 object-contain"></div><p class="text-blue-600 font-bold text-xs">KBank : 1981049493</p></div>
+            <div class="flex gap-4"><button onclick="closeCheckout()" class="flex-1 font-bold text-gray-400 py-5 uppercase text-xs">ยกเลิก</button><button onclick="submitOrder()" class="flex-[2] bg-blue-600 text-white py-5 rounded-[2.5rem] font-bold shadow-2xl btn-touch uppercase tracking-widest">ยืนยันการขาย</button></div>
+        </div>
+    </div>
+
+    <script>
+        const config = {
+            apiKey: "AIzaSyAvqnQ-j9nDKuXfmDe7Jr28cJcydnKxcjM",
+            authDomain: "leungcheuluecha.firebaseapp.com",
+            databaseURL: "https://leungcheuluecha-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "leungcheuluecha"
+        };
+        firebase.initializeApp(config);
+        const db = firebase.database();
+
+        let products = [], orders = [], cart = [];
+        let curCat = "ทั้งหมด", editIdx = -1, selectedP = null, chosenMods = [], payMethod = 'Cash', repRange = 'today';
+
+        // SYNC
+        db.ref('products').on('value', snap => { products = snap.val() || []; renderPOS(); renderStock(); });
+        db.ref('orders').on('value', snap => { orders = Object.entries(snap.val() || {}).map(([id,v])=>({id,...v})); renderKitchen(); updateReport(); });
+
+        function showPage(p) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('page-'+p).classList.remove('hidden');
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+            document.getElementById('nav-'+p).classList.add('tab-active');
+            updateCartUI();
+            if(p === 'report') setTimeout(renderChart, 300);
+        }
+
+        // POS
+        function renderPOS() {
+            const grid = document.getElementById('pos-grid');
+            const search = (document.getElementById('search').value || "").toLowerCase();
+            const cats = ["ทั้งหมด", ...new Set(products.map(p => p.category || "ทั่วไป"))];
+            document.getElementById('pos-cats').innerHTML = cats.map(c => `<button onclick="setCat('${c}')" class="px-6 py-2 rounded-full font-bold text-[10px] border whitespace-nowrap uppercase btn-touch ${curCat===c?'bg-blue-600 text-white shadow-md border-blue-600':'bg-white text-gray-400 border-gray-100'}">${c}</button>`).join('');
+            const filtered = products.filter(p => (curCat==="ทั้งหมด" || (p.category||"ทั่วไป")===curCat) && p.name.toLowerCase().includes(search));
+            grid.innerHTML = filtered.map(p => {
+                const idx = products.indexOf(p);
+                return `<div onclick="selectProduct(${idx})" class="bg-white p-3 rounded-[2.5rem] shadow-sm border border-blue-50 btn-touch card-active anim-up">
+                    <img src="${p.img || 'https://via.placeholder.com/200'}" class="w-full h-24 object-cover rounded-[1.8rem] mb-2 bg-gray-50">
+                    <div class="font-bold text-xs px-2 truncate pointer-events-none">${p.name}</div>
+                    <div class="text-blue-600 font-bold text-sm px-2 italic pointer-events-none">฿${p.price.toLocaleString()}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function setCat(c) { curCat = c; renderPOS(); }
+
+        function selectProduct(idx) {
+            const p = products[idx]; selectedP = { ...p, pid: idx }; chosenMods = [];
+            const modsArr = p.modifiers ? p.modifiers.split(',').map(m => {
+                const [n, pr] = m.split(':'
