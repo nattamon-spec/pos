@@ -39,4 +39,482 @@
         <h1 class="text-3xl font-bold text-blue-600 mb-2">เลื่องชื่อลือชา</h1>
         <p class="text-gray-400 mb-8 uppercase tracking-widest text-xs">Enter PIN to Unlock</p>
         <div id="pin-display" class="flex gap-4 mb-10">
-            <div class="w-4 h-4 rounded-full border-2 border-blue
+            <div class="w-4 h-4 rounded-full border-2 border-blue-200"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-blue-200"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-blue-200"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-blue-200"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-4 w-full max-w-[300px]">
+            <button onclick="pressPin('1')" class="pin-btn">1</button>
+            <button onclick="pressPin('2')" class="pin-btn">2</button>
+            <button onclick="pressPin('3')" class="pin-btn">3</button>
+            <button onclick="pressPin('4')" class="pin-btn">4</button>
+            <button onclick="pressPin('5')" class="pin-btn">5</button>
+            <button onclick="pressPin('6')" class="pin-btn">6</button>
+            <button onclick="pressPin('7')" class="pin-btn">7</button>
+            <button onclick="pressPin('8')" class="pin-btn">8</button>
+            <button onclick="pressPin('9')" class="pin-btn">9</button>
+            <button onclick="clearPin()" class="pin-btn text-sm text-red-500">C</button>
+            <button onclick="pressPin('0')" class="pin-btn">0</button>
+            <button onclick="checkPin()" class="pin-btn text-sm text-blue-500">OK</button>
+        </div>
+        <p class="mt-8 text-[10px] text-gray-300 italic">Default PIN: 1234</p>
+    </div>
+
+    <!-- 2. MAIN APP NAVIGATION -->
+    <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-blue-50 shadow-sm">
+        <div>
+            <h1 class="text-xl font-bold text-[#004A99]">เลื่องชื่อลือชา</h1>
+            <p id="staff-name-label" class="text-[10px] text-gray-400 font-bold uppercase"></p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="logout()" class="text-gray-300 text-xs font-bold uppercase border px-2 py-1 rounded-lg">Logout</button>
+            <div id="db-status" class="text-[9px] px-2 py-1 rounded-full font-bold bg-green-50 text-green-500">Online</div>
+        </div>
+    </header>
+
+    <div id="main-view">
+        <!-- PAGE: DASHBOARD (Report) -->
+        <section id="page-report" class="p-4 hidden anim-up">
+            <div class="flex gap-2 overflow-x-auto pb-4 hide-scroll">
+                <button onclick="setReportTime('today')" class="range-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold">วันนี้</button>
+                <button onclick="setReportTime('7days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
+                <button onclick="setReportTime('30days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
+            </div>
+
+            <!-- Financials -->
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
+                <p class="text-[10px] font-bold text-blue-400 uppercase mb-1">ยอดขายทั้งหมด</p>
+                <h2 id="rep-total-sales" class="text-5xl font-bold text-blue-600 tracking-tighter">฿0</h2>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-green-50 p-4 rounded-3xl border border-green-100">
+                    <p class="text-[9px] text-green-600 uppercase font-bold">กำไรสุทธิ</p>
+                    <p id="rep-profit" class="text-xl font-bold text-green-700">฿0</p>
+                </div>
+                <div class="bg-orange-50 p-4 rounded-3xl border border-orange-100">
+                    <p class="text-[9px] text-orange-600 uppercase font-bold">ภาษี 7%</p>
+                    <p id="rep-tax" class="text-xl font-bold text-orange-700">฿0</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6">
+                <canvas id="salesChart"></canvas>
+            </div>
+
+            <h3 class="font-bold text-sm mb-4">🏆 สินค้าขายดี</h3>
+            <div id="top-products" class="space-y-2 mb-8"></div>
+        </section>
+
+        <!-- PAGE: POS (Sell) -->
+        <section id="page-sell" class="p-4 block">
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนู หรือสแกนบาร์โค้ด..." class="flex-1 p-4 rounded-2xl bg-white shadow-sm border-none outline-none">
+                <button onclick="openTables()" class="bg-blue-600 text-white px-4 rounded-2xl btn-touch">🪑</button>
+            </div>
+            <div id="pos-cats" class="flex gap-2 overflow-x-auto pb-4 hide-scroll"></div>
+            <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-32"></div>
+        </section>
+
+        <!-- PAGE: KITCHEN -->
+        <section id="page-kitchen" class="p-4 hidden">
+            <h2 class="text-xl font-bold mb-6">ออเดอร์ในครัว</h2>
+            <div id="kitchen-list" class="space-y-4"></div>
+        </section>
+
+        <!-- PAGE: STOCK (Visual Control) -->
+        <section id="page-stock" class="p-4 hidden">
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-blue-600 p-5 rounded-3xl text-white shadow-lg">
+                    <p class="text-[9px] font-bold uppercase opacity-70">สินค้า</p>
+                    <p id="stk-count" class="text-3xl font-bold">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-3xl border border-blue-50 text-blue-600">
+                    <p class="text-[9px] font-bold uppercase opacity-50">มูลค่าคลัง</p>
+                    <p id="stk-value" class="text-2xl font-bold">฿0</p>
+                </div>
+            </div>
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="font-bold">คลังสินค้า</h3>
+                <button onclick="openProductModal()" class="btn-touch bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md">+ เพิ่มสินค้า</button>
+            </div>
+            <div id="admin-list" class="space-y-3"></div>
+        </section>
+    </div>
+
+    <!-- CART BOTTOM BAR -->
+    <div id="cart-bar" class="fixed bottom-24 left-4 right-4 bg-white p-4 rounded-[2rem] shadow-2xl flex justify-between items-center hidden z-40 border border-blue-50 animate-bounce">
+        <div class="flex items-center gap-4">
+            <div id="cart-qty" class="bg-blue-600 text-white w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold">0</div>
+            <div id="cart-total" class="text-2xl font-bold text-[#004A99] tracking-tighter font-mono">฿0</div>
+        </div>
+        <button onclick="openCheckout()" class="btn-touch bg-blue-600 text-white px-10 py-3 rounded-2xl font-bold text-sm">ชำระเงิน</button>
+    </div>
+
+    <!-- BOTTOM TAB NAVIGATION -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-50 flex justify-around p-3 pb-8 z-50">
+        <button onclick="showPage('report')" id="nav-report" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
+            <span class="text-xl">📊</span><span class="text-[9px] font-bold uppercase">Report</span>
+        </button>
+        <button onclick="showPage('sell')" id="nav-sell" class="flex flex-col items-center gap-1 text-gray-300 tab-active btn-touch">
+            <span class="text-xl">🛒</span><span class="text-[9px] font-bold uppercase">Sell</span>
+        </button>
+        <button onclick="showPage('kitchen')" id="nav-kitchen" class="flex flex-col items-center gap-1 text-gray-300 relative btn-touch">
+            <span class="text-xl">👨‍🍳</span><span id="k-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1.5 rounded-full hidden">0</span>
+            <span class="text-[9px] font-bold uppercase">Kitchen</span>
+        </button>
+        <button onclick="showPage('stock')" id="nav-stock" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
+            <span class="text-xl">📦</span><span class="text-[9px] font-bold uppercase">Stock</span>
+        </button>
+    </nav>
+
+    <!-- MODAL: MODIFIERS (Loyverse Style) -->
+    <div id="mod-modal" class="fixed inset-0 bg-black/60 hidden z-[100] flex items-end">
+        <div class="bg-white w-full rounded-t-[3rem] p-8 max-h-[85vh] overflow-y-auto anim-up">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
+            <h3 id="mod-p-name" class="text-2xl font-bold mb-1">เมนู</h3>
+            <p id="mod-p-price" class="text-blue-600 font-bold mb-6 italic">฿0</p>
+            <div id="mod-list" class="space-y-6"></div>
+            <div class="flex justify-between items-center sticky bottom-0 bg-white pt-6 border-t mt-8">
+                <p id="mod-total" class="text-3xl font-bold text-red-600 font-mono">฿0</p>
+                <button onclick="addCartWithMods()" class="bg-blue-600 text-white px-12 py-4 rounded-[2rem] font-bold shadow-lg">เพิ่มรายการ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CHECKOUT -->
+    <div id="pay-modal" class="fixed inset-0 bg-black/70 hidden z-[200] flex items-end">
+        <div class="bg-white w-full rounded-t-[3.5rem] p-8 pb-12 shadow-2xl anim-up">
+            <div class="text-center mb-6">
+                <p class="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Total Amount</p>
+                <h2 id="pay-display" class="text-7xl font-bold text-blue-600 tracking-tighter font-mono">฿0</h2>
+            </div>
+            <div class="grid grid-cols-3 gap-3 mb-8">
+                <button onclick="setMethod('Cash')" id="m-Cash" class="btn-touch p-4 bg-blue-50 border-2 border-blue-600 rounded-3xl flex flex-col items-center">
+                    <span class="text-2xl">💵</span><span class="text-[9px] font-bold uppercase">Cash</span>
+                </button>
+                <button onclick="setMethod('Transfer')" id="m-Transfer" class="btn-touch p-4 bg-gray-50 border-2 border-transparent rounded-3xl flex flex-col items-center">
+                    <span class="text-2xl">📱</span><span class="text-[9px] font-bold uppercase">KBank</span>
+                </button>
+                <button onclick="setMethod('ThaiPlus')" id="m-ThaiPlus" class="btn-touch p-4 bg-gray-50 border-2 border-transparent rounded-3xl flex flex-col items-center">
+                    <span class="text-2xl">💎</span><span class="text-[9px] font-bold uppercase">ThaiPlus</span>
+                </button>
+            </div>
+            <div id="box-Cash" class="mb-8">
+                <div class="flex gap-2 mb-4 overflow-x-auto hide-scroll pb-2">
+                    <button onclick="quickCash(100)" class="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold">฿100</button>
+                    <button onclick="quickCash(500)" class="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold">฿500</button>
+                    <button onclick="quickCash(1000)" class="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold">฿1000</button>
+                </div>
+                <input type="number" id="cash-in" oninput="calcChange()" placeholder="รับเงินมา..." class="w-full p-6 bg-blue-50 rounded-[2.5rem] text-4xl text-center font-bold text-blue-600 outline-none shadow-inner">
+                <p class="text-center mt-4 font-bold">เงินทอน: <span id="change-txt" class="text-green-600 text-2xl">฿0</span></p>
+            </div>
+            <div id="box-Transfer" class="hidden flex flex-col items-center mb-8">
+                <img id="qr-img" class="w-52 h-56 object-contain border p-2 rounded-3xl mb-2">
+                <p class="text-blue-600 font-bold text-xs">KBANK: 1981049493</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeCheckout()" class="flex-1 font-bold text-gray-400 py-3 uppercase text-xs">Close</button>
+                <button onclick="submitOrder()" class="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg btn-touch">ยืนยันและรับเงิน</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PRODUCT ADMIN -->
+    <div id="admin-modal" class="fixed inset-0 bg-black/60 hidden z-[300] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <h2 class="text-2xl font-bold mb-6">ข้อมูลสินค้า</h2>
+            <div class="space-y-4">
+                <div class="flex flex-col items-center mb-4">
+                    <img id="admin-preview" class="w-32 h-32 rounded-3xl object-cover bg-gray-50 border shadow-sm mb-2">
+                    <label class="bg-blue-50 text-blue-600 text-[10px] font-bold px-5 py-2 rounded-full cursor-pointer uppercase border border-blue-100">
+                        + เลือกรูปภาพ
+                        <input type="file" id="img-input" accept="image/*" class="hidden" onchange="previewImg(event)">
+                    </label>
+                </div>
+                <input type="text" id="admin-name" placeholder="ชื่อสินค้า" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="number" id="admin-price" placeholder="ราคาขาย" class="p-4 bg-gray-50 rounded-2xl outline-none font-bold">
+                    <input type="number" id="admin-cost" placeholder="ต้นทุน" class="p-4 bg-gray-50 rounded-2xl outline-none text-gray-400 italic">
+                </div>
+                <input type="number" id="admin-stock" placeholder="สต็อกคงเหลือ" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
+                <input type="text" id="admin-cat" placeholder="หมวดหมู่ (อาหาร, น้ำ, ฯลฯ)" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
+                <div class="bg-blue-50 p-4 rounded-3xl">
+                    <p class="text-[10px] font-bold text-blue-500 mb-2 uppercase">ตัวเลือกเสริม (เช่น พิเศษ:10, ไข่ดาว:10)</p>
+                    <input type="text" id="admin-mods" placeholder="ชื่อ:ราคา, ชื่อ:ราคา" class="w-full p-3 bg-white rounded-xl text-xs border-none shadow-sm">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="closeAdminModal()" class="flex-1 font-bold text-gray-400 py-3 text-xs uppercase">ปิด</button>
+                    <button onclick="saveProduct()" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg btn-touch uppercase text-xs">บันทึก</button>
+                </div>
+                <button onclick="deleteProduct()" id="btn-del" class="w-full text-red-300 text-[10px] font-bold uppercase hidden py-2 underline">ลบสินค้านี้</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: TABLES -->
+    <div id="table-modal" class="fixed inset-0 bg-black/60 hidden z-[400] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-[2.5rem] p-8 max-h-[80vh] overflow-y-auto">
+            <h2 class="text-2xl font-bold mb-6">เลือกโต๊ะ / บริการ</h2>
+            <div id="table-grid" class="grid grid-cols-3 gap-4 mb-8">
+                <!-- Tables -->
+            </div>
+            <button onclick="document.getElementById('table-modal').classList.add('hidden')" class="w-full py-4 font-bold text-gray-400 uppercase">ปิด</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const fbConfig = {
+            apiKey: "AIzaSyAvqnQ-j9nDKuXfmDe7Jr28cJcydnKxcjM",
+            authDomain: "leungcheuluecha.firebaseapp.com",
+            databaseURL: "https://leungcheuluecha-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "leungcheuluecha"
+        };
+        firebase.initializeApp(fbConfig);
+        const db = firebase.database();
+
+        let state = {
+            products: [], orders: [], cart: [], settings: { kbank: "1981049493" },
+            curCat: "ทั้งหมด", editIdx: -1, selectedP: null, chosenMods: [], 
+            payMethod: 'Cash', repRange: 'today', pin: "", 
+            staff: { name: "แคชเชียร์ A", role: "admin", pin: "1234" },
+            isUnlocked: false
+        };
+
+        // --- AUTH LOGIC ---
+        function pressPin(num) {
+            if(state.pin.length < 4) {
+                state.pin += num;
+                updatePinDisplay();
+            }
+        }
+        function clearPin() { state.pin = ""; updatePinDisplay(); }
+        function updatePinDisplay() {
+            const dots = document.querySelectorAll('#pin-display div');
+            dots.forEach((d, i) => d.style.background = i < state.pin.length ? '#007AFF' : 'transparent');
+        }
+        function checkPin() {
+            if(state.pin === state.staff.pin) {
+                state.isUnlocked = true;
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('staff-name-label').innerText = state.staff.name;
+                clearPin();
+            } else {
+                alert("PIN ผิดพลาด!");
+                clearPin();
+            }
+        }
+        function logout() { state.isUnlocked = false; document.getElementById('auth-screen').classList.remove('hidden'); }
+
+        // --- DATA SYNC ---
+        db.ref('products').on('value', snap => { state.products = snap.val() || []; renderPOS(); renderStock(); });
+        db.ref('orders').on('value', snap => { state.orders = Object.entries(snap.val() || {}).map(([id,v])=>({id,...v})); renderKitchen(); loadReport(); });
+
+        // --- UI NAVIGATION ---
+        function showPage(p) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('page-'+p).classList.remove('hidden');
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+            document.getElementById('nav-'+p).classList.add('tab-active');
+            updateCartBar();
+            if(p === 'report') setTimeout(renderChart, 300);
+        }
+
+        // --- POS FUNCTIONS ---
+        function renderPOS() {
+            const grid = document.getElementById('pos-grid');
+            const search = (document.getElementById('search').value || "").toLowerCase();
+            const cats = ["ทั้งหมด", ...new Set(state.products.map(p => p.category || "ทั่วไป"))];
+            document.getElementById('pos-cats').innerHTML = cats.map(c => `<button onclick="setCat('${c}')" class="px-5 py-2 rounded-full font-bold text-[10px] border whitespace-nowrap uppercase btn-touch ${state.curCat===c?'bg-blue-600 text-white shadow-md':'bg-white text-gray-400'}">${c}</button>`).join('');
+            const filtered = state.products.filter(p => (state.curCat==="ทั้งหมด" || (p.category||"ทั่วไป")===state.curCat) && p.name.toLowerCase().includes(search));
+            grid.innerHTML = filtered.map(p => {
+                const idx = state.products.indexOf(p);
+                return `<div onclick="selectProduct(${idx})" class="bg-white p-2.5 rounded-[2rem] shadow-sm border border-blue-50 btn-touch card-active anim-up">
+                    <img src="${p.img || 'https://via.placeholder.com/200'}" class="w-full h-24 object-cover rounded-[1.5rem] mb-2 bg-gray-50">
+                    <div class="font-bold text-xs px-2 truncate">${p.name}</div>
+                    <div class="text-blue-600 font-bold text-sm px-2 italic font-mono tracking-tighter">฿${p.price}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function setCat(c) { state.curCat = c; renderPOS(); }
+
+        function selectProduct(idx) {
+            const p = state.products[idx]; state.selectedP = { ...p, pid: idx }; state.chosenMods = [];
+            const modsArr = p.modifiers ? p.modifiers.split(',').map(m => {
+                const parts = m.split(':'); return { name: parts[0].trim(), price: parseInt(parts[1]) || 0 };
+            }) : [];
+            if (modsArr.length > 0) {
+                document.getElementById('mod-p-name').innerText = p.name;
+                document.getElementById('mod-p-price').innerText = `ราคาเริ่มต้น ฿${p.price}`;
+                document.getElementById('mod-list').innerHTML = `<div class="grid grid-cols-2 gap-2">${modsArr.map((m, i) => `<div onclick="toggleMod(this, '${m.name}', ${m.price})" class="bg-gray-50 p-4 rounded-2xl border-2 border-transparent text-center btn-touch shadow-sm"><div class="text-xs font-bold">${m.name}</div><div class="text-[10px] text-gray-400">+฿${m.price}</div></div>`).join('')}</div>`;
+                updateModTotal(); document.getElementById('mod-modal').classList.remove('hidden');
+            } else { addToCart(p, []); }
+        }
+
+        function toggleMod(el, name, price) {
+            const idx = state.chosenMods.findIndex(m => m.name === name);
+            if (idx > -1) { state.chosenMods.splice(idx, 1); el.classList.remove('mod-selected'); }
+            else { state.chosenMods.push({ name, price }); el.classList.add('mod-selected'); }
+            updateModTotal();
+        }
+
+        function updateModTotal() { document.getElementById('mod-total').innerText = `฿${state.selectedP.price + state.chosenMods.reduce((s, m) => s + m.price, 0)}`; }
+        function addCartWithMods() { addToCart(state.selectedP, state.chosenMods); document.getElementById('mod-modal').classList.add('hidden'); }
+
+        function addToCart(p, mods) {
+            const finalP = p.price + mods.reduce((s, m) => s + m.price, 0);
+            state.cart.push({ ...p, finalPrice: finalP, totalCost: parseFloat(p.cost)||0, mods: mods.map(m => m.name) });
+            updateCartBar();
+        }
+
+        function updateCartBar() {
+            const bar = document.getElementById('cart-bar');
+            if(state.cart.length > 0 && !document.getElementById('page-sell').classList.contains('hidden')) {
+                bar.classList.remove('hidden');
+                const total = state.cart.reduce((s, i) => s + i.finalPrice, 0);
+                document.getElementById('cart-qty').innerText = state.cart.length;
+                document.getElementById('cart-total').innerText = "฿" + total.toLocaleString();
+            } else bar.classList.add('hidden');
+        }
+
+        // --- CHECKOUT & PAY ---
+        function openCheckout() {
+            const total = state.cart.reduce((s, i) => s + i.finalPrice, 0);
+            document.getElementById('pay-display').innerText = "฿" + total.toLocaleString();
+            setMethod('Cash'); document.getElementById('pay-modal').classList.remove('hidden');
+        }
+        function setMethod(m) {
+            state.payMethod = m;
+            ['Cash', 'Transfer', 'ThaiPlus'].forEach(x => {
+                document.getElementById('m-'+x).classList.replace('bg-blue-50', 'bg-gray-50');
+                document.getElementById('m-'+x).classList.replace('border-blue-600', 'border-transparent');
+            });
+            document.getElementById('m-'+m).classList.replace('bg-gray-50', 'bg-blue-50');
+            document.getElementById('m-'+m).classList.replace('border-transparent', 'border-blue-600');
+            document.getElementById('box-Cash').classList.toggle('hidden', m !== 'Cash');
+            document.getElementById('box-Transfer').classList.toggle('hidden', m !== 'Transfer');
+            if(m === 'Transfer') {
+                const total = state.cart.reduce((s, i) => s + i.finalPrice, 0);
+                document.getElementById('qr-img').src = "https://promptpay.io/1981049493/" + total + ".png";
+            }
+        }
+        function quickCash(amt) { document.getElementById('cash-in').value = amt; calcChange(); }
+        function calcChange() {
+            const total = state.cart.reduce((s, i) => s + i.finalPrice, 0);
+            const input = parseFloat(document.getElementById('cash-in').value) || 0;
+            document.getElementById('change-txt').innerText = `฿${Math.max(0, input - total).toLocaleString()}`;
+        }
+        function submitOrder() {
+            const total = state.cart.reduce((s, i) => s + i.finalPrice, 0);
+            const cost = state.cart.reduce((s, i) => s + (parseFloat(i.totalCost) || 0), 0);
+            const data = { items: state.cart, total, cost, method: state.payMethod, ts: Date.now(), date: new Date().toISOString().split('T')[0], staff: state.staff.name };
+            db.ref('orders').push(data).then(() => {
+                state.cart.forEach(i => db.ref(`products/${i.pid}/stock`).transaction(s => Math.max(0, (s || 0) - 1)));
+                alert("✅ ขายสำเร็จ! (สั่งพิมพ์ใบเสร็จ...)"); 
+                state.cart = []; closeCheckout(); updateCartBar();
+            });
+        }
+        function closeCheckout() { document.getElementById('pay-modal').classList.add('hidden'); }
+
+        // --- KITCHEN ---
+        function renderKitchen() {
+            const pending = state.orders.filter(o => o.status !== 'done');
+            document.getElementById('k-badge').innerText = pending.length;
+            document.getElementById('k-badge').classList.toggle('hidden', pending.length === 0);
+            document.getElementById('kitchen-list').innerHTML = pending.reverse().map(o => `
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 anim-up">
+                    <div class="flex justify-between mb-4"><span class="text-[10px] font-bold text-blue-400 uppercase">#${o.id.slice(-4)}</span><span class="px-2 py-0.5 rounded-full text-[8px] font-bold uppercase bg-blue-50 text-blue-600">${o.method}</span></div>
+                    <div class="space-y-1 mb-6">${o.items.map(i => `<div class="font-bold text-lg">● ${i.name} <span class="text-red-400 text-xs">${i.mods ? '('+i.mods.join(',')+')' : ''}</span></div>`).join('')}</div>
+                    <button onclick="doneOrder('${o.id}')" class="w-full bg-[#E3F2FD] text-blue-600 py-4 rounded-2xl font-bold btn-touch">ทำเสร็จแล้ว</button>
+                </div>`).join('');
+        }
+        function doneOrder(id) { db.ref(`orders/${id}`).update({ status: 'done' }); }
+
+        // --- STOCK ---
+        function renderStock() {
+            document.getElementById('stk-count').innerText = state.products.length;
+            document.getElementById('stk-value').innerText = `฿${state.products.reduce((s,p)=>s+((p.cost||0)*(p.stock||0)),0).toLocaleString()}`;
+            document.getElementById('admin-list').innerHTML = state.products.map((p, i) => `
+                <div onclick="editProduct(${i})" class="bg-white p-4 rounded-3xl flex justify-between items-center border border-blue-50 btn-touch card-active">
+                    <div class="flex items-center gap-3"><img src="${p.img || ''}" class="w-12 h-12 rounded-2xl object-cover bg-gray-100">
+                    <div><div class="font-bold text-sm">${p.name}</div><div class="text-[9px] text-blue-400 font-bold uppercase tracking-widest">STOCK: ${p.stock||0} | COST: ฿${p.cost||0}</div></div></div>
+                    <span class="text-blue-600 text-xs font-bold">Edit ></span>
+                </div>`).join('');
+        }
+        function openProductModal() { state.editIdx = -1; resetAdmin(); document.getElementById('btn-del').classList.add('hidden'); document.getElementById('admin-modal').classList.remove('hidden'); }
+        function editProduct(i) {
+            state.editIdx = i; const p = state.products[i];
+            document.getElementById('admin-name').value = p.name; document.getElementById('admin-price').value = p.price;
+            document.getElementById('admin-cost').value = p.cost; document.getElementById('admin-stock').value = p.stock;
+            document.getElementById('admin-cat').value = p.category; document.getElementById('admin-mods').value = p.modifiers || "";
+            document.getElementById('admin-preview').src = p.img || ""; document.getElementById('btn-del').classList.remove('hidden');
+            document.getElementById('admin-modal').classList.remove('hidden');
+        }
+        function previewImg(e) {
+            const r = new FileReader(); r.onload = (ev) => {
+                const img = new Image(); img.onload = () => {
+                    const cvs = document.createElement('canvas'); const s = 250 / img.width; cvs.width = 250; cvs.height = img.height * s;
+                    cvs.getContext('2d').drawImage(img, 0, 0, 250, cvs.height);
+                    document.getElementById('admin-preview').src = cvs.toDataURL('image/jpeg', 0.6);
+                }; img.src = ev.target.result;
+            }; r.readAsDataURL(e.target.files[0]);
+        }
+        function saveProduct() {
+            const data = { name: document.getElementById('admin-name').value, price: parseFloat(document.getElementById('admin-price').value) || 0, cost: parseFloat(document.getElementById('admin-cost').value) || 0, stock: parseInt(document.getElementById('admin-stock').value) || 0, category: document.getElementById('admin-cat').value || "ทั่วไป", img: document.getElementById('admin-preview').src, modifiers: document.getElementById('admin-mods').value };
+            if(state.editIdx === -1) state.products.push(data); else state.products[state.editIdx] = data;
+            db.ref('products').set(state.products).then(() => { closeAdminModal(); alert("บันทึกแล้ว!"); });
+        }
+        function deleteProduct() { if(confirm("ลบ?")) { state.products.splice(state.editIdx, 1); db.ref('products').set(state.products); closeAdminModal(); } }
+        function resetAdmin() { ["admin-name","admin-price","admin-cost","admin-stock","admin-cat","admin-mods"].forEach(id => document.getElementById(id).value = ""); document.getElementById('admin-preview').src = ""; }
+        function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
+
+        // --- REPORTS ---
+        function setReportTime(r) { state.repRange = r; loadReport(); }
+        function loadReport() {
+            const now = new Date(); let start;
+            if(state.repRange === 'today') start = now.setHours(0,0,0,0);
+            else if(state.repRange === '7days') start = now.setDate(now.getDate() - 7);
+            const filtered = state.orders.filter(o => o.ts >= start);
+            const total = filtered.reduce((s,o)=>s+o.total,0);
+            document.getElementById('rep-total-sales').innerText = `฿${total.toLocaleString()}`;
+            document.getElementById('rep-profit').innerText = `฿${(total - filtered.reduce((s,o)=>s+(o.cost||0),0)).toLocaleString()}`;
+            document.getElementById('rep-tax').innerText = `฿${(total * 0.07).toLocaleString()}`;
+            
+            const prodCounts = {};
+            filtered.forEach(o => o.items.forEach(i => prodCounts[i.name] = (prodCounts[i.name] || 0) + 1));
+            const sorted = Object.entries(prodCounts).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            document.getElementById('top-products').innerHTML = sorted.map(([n, q]) => `<div class="bg-white p-3 rounded-2xl border flex justify-between text-xs font-bold"><span>${n}</span><span class="text-blue-600">${q} จาน</span></div>`).join('');
+            renderChart(filtered);
+        }
+        let chart;
+        function renderChart(data) {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            const c = data.filter(o=>o.method==='Cash').reduce((s,o)=>s+o.total,0);
+            const t = data.filter(o=>o.method==='Transfer').reduce((s,o)=>s+o.total,0);
+            const tp = data.filter(o=>o.method==='ThaiPlus').reduce((s,o)=>s+o.total,0);
+            if(chart) chart.destroy();
+            chart = new Chart(ctx, { type: 'doughnut', data: { labels: ['Cash', 'KBank', 'ThaiPlus'], datasets: [{ data: [c, t, tp], backgroundColor: ['#10b981', '#3b82f6', '#8b5cf6'], borderWidth: 0 }] }, options: { cutout: '85%', plugins: { legend: { position: 'bottom' } } } });
+        }
+
+        // --- TABLES ---
+        function openTables() {
+            document.getElementById('table-modal').classList.remove('hidden');
+            const grid = document.getElementById('table-grid');
+            grid.innerHTML = Array.from({length:12}, (_,i)=>i+1).map(n => `
+                <div onclick="selectProduct(0)" class="aspect-square bg-gray-50 border rounded-2xl flex items-center justify-center font-bold text-gray-400 card-active btn-touch">โต๊ะ ${n}</div>
+            `).join('');
+        }
+
+        function seedInitial() {
+            if(!confirm("ติดตั้งสินค้าเริ่มต้น?")) return;
+            db.ref('products').set([{ name: "ข้าวมันไก่ Enterprise", price: 65, cost: 30, stock: 100, category: "อาหารหลัก", modifiers: "พิเศษ:10, เพิ่มไข่:10", img: "" }]);
+        }
+
+        // --- START ---
+        showPage('sell');
+    </script>
+</body>
+</html>
