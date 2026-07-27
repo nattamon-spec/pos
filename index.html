@@ -3,58 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>เลื่องชื่อลือชา POS Enterprise</title>
-    <!-- Firebase SDK 8.10.1 -->
+    <title>เลื่องชื่อลือชา POS - Golden Edition</title>
+    <!-- SDK & Fonts -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root { --p-teal: #1A5F7A; --s-teal: #159895; --bg-cream: #FDFBF7; --p-blue: #007AFF; }
+        :root { --p-teal: #1A5F7A; --s-teal: #159895; --bg-cream: #FDFBF7; --p-blue: #007AFF; --accent-red: #EE6969; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg-cream); color: #334155; touch-action: manipulation; }
         .btn-touch { transition: all 0.1s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; outline: none; }
-        .btn-touch:active { transform: scale(0.96); background-color: #E3F2FD; }
+        .btn-touch:active { transform: scale(0.96); opacity: 0.8; background-color: #E3F2FD; }
         .tab-active { color: var(--p-blue) !important; border-top: 4px solid var(--p-blue); font-weight: 600; }
         .opt-selected { background-color: var(--s-teal) !important; color: white !important; border-color: var(--s-teal) !important; }
         .hide-scroll::-webkit-scrollbar { display: none; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .anim-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .shadow-premium { box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1); }
     </style>
 </head>
 <body class="pb-28">
 
-    <!-- 1. LOADING OVERLAY -->
-    <div id="loader" class="fixed inset-0 bg-white z-[500] flex flex-col items-center justify-center p-6 text-center">
-        <div class="w-16 h-16 border-4 border-blue-50 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-        <h2 class="text-xl font-bold text-gray-700 uppercase tracking-tighter">Leung Cheu Lue Cha</h2>
-        <p class="text-xs text-gray-400 mt-2 italic">กำลังเชื่อมต่อระบบ Enterprise Cloud...</p>
-    </div>
-
-    <!-- 2. SHIFT GUARD (ระบบเปิดกะ) -->
+    <!-- SHIFT GUARD (ระบบเปิดกะ) -->
     <div id="shift-guard" class="fixed inset-0 bg-black/60 z-[450] hidden flex items-center justify-center p-6">
         <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl anim-up">
             <h2 class="text-2xl font-bold text-[#1A5F7A] mb-2">เปิดกะการขาย</h2>
-            <p class="text-gray-400 text-xs mb-8 uppercase font-bold tracking-widest">ระบุเงินทอนเริ่มต้นในลิ้นชัก</p>
+            <p class="text-gray-400 text-xs mb-8 uppercase font-bold tracking-widest">ระบุเงินทอนเริ่มต้น</p>
             <input type="number" id="float-cash" placeholder="0.00" class="w-full p-5 bg-gray-50 rounded-2xl text-4xl text-center font-bold text-blue-600 outline-none mb-6 shadow-inner">
             <button onclick="startShift()" class="w-full bg-[#1A5F7A] text-white py-4 rounded-[2rem] font-bold shadow-lg btn-touch">เริ่มต้นการขาย</button>
         </div>
     </div>
 
-    <!-- 3. HEADER -->
+    <!-- HEADER -->
     <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-blue-50 shadow-sm">
         <div>
-            <h1 class="text-xl font-bold text-[#004A99] tracking-tighter uppercase italic">เลื่องชื่อลือชา</h1>
-            <p id="shift-info-label" class="text-[10px] text-gray-400 font-bold uppercase">กะปัจจุบัน: ฿0</p>
+            <h1 class="text-xl font-bold text-[#004A99] tracking-tighter uppercase italic">Leung Cheu Lue Cha</h1>
+            <p id="shift-label" class="text-[10px] text-gray-400 font-bold uppercase">Shift: ฿0</p>
         </div>
-        <div id="db-status" class="text-[9px] px-2 py-1 rounded-full font-bold bg-green-50 text-green-500 uppercase">● ออนไลน์</div>
+        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-500 uppercase">● ออนไลน์</div>
     </header>
 
     <div id="main-app">
-        <!-- PAGE: REPORT (Advanced Analytics) -->
+        <!-- 1. REPORT PAGE (MuayMoney Analytics) -->
         <section id="page-report" class="p-4 hidden anim-up">
             <div class="flex gap-2 overflow-x-auto pb-4 hide-scroll">
-                <button onclick="updateStats('today')" class="r-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold">วันนี้</button>
+                <button onclick="updateStats('today')" class="r-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold shadow-sm">วันนี้</button>
                 <button onclick="updateStats('7days')" class="r-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
                 <button onclick="updateStats('30days')" class="r-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
             </div>
@@ -79,7 +73,7 @@
                 <canvas id="salesChart"></canvas>
             </div>
 
-            <div class="space-y-3 mb-8">
+            <div class="space-y-3 mb-10">
                 <div class="bg-blue-50 p-4 rounded-2xl flex justify-between items-center">
                     <span class="text-sm font-bold">🛵 ยอดเดลิเวอรี</span><span id="rep-deli" class="font-bold text-blue-600">฿0</span>
                 </div>
@@ -88,10 +82,13 @@
                 </div>
             </div>
             
+            <h3 class="font-bold text-sm mb-4">🏆 สินค้าขายดี</h3>
+            <div id="top-products" class="space-y-2 mb-10"></div>
+            
             <button onclick="closeShift()" class="w-full py-5 bg-red-50 text-red-600 rounded-[2rem] font-bold uppercase tracking-widest text-xs border-2 border-red-100 btn-touch">ปิดกะการขาย (End Shift)</button>
         </section>
 
-        <!-- PAGE: SELL (POS) -->
+        <!-- 2. SELL PAGE (POS) -->
         <section id="page-sell" class="p-4 block">
             <div class="mb-4">
                 <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนูสินค้า..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
@@ -100,18 +97,18 @@
             <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-32"></div>
         </section>
 
-        <!-- PAGE: KITCHEN -->
+        <!-- 3. KITCHEN PAGE -->
         <section id="page-kitchen" class="p-4 hidden anim-up">
             <h2 class="text-xl font-bold mb-6 italic uppercase text-gray-400">รายการรอทำ</h2>
             <div id="kitchen-list" class="space-y-4"></div>
         </section>
 
-        <!-- PAGE: STOCK (Visual Control) -->
+        <!-- 4. STOCK PAGE (Visual Control) -->
         <section id="page-stock" class="p-4 hidden anim-up">
             <div class="grid grid-cols-2 gap-3 mb-6 text-center font-bold">
                 <div class="bg-blue-600 p-5 rounded-3xl text-white shadow-lg">
                     <p class="text-[9px] uppercase opacity-70">สินค้าในระบบ</p>
-                    <p id="stk-count" class="text-3xl">0</p>
+                    <p id="stk-count" class="text-3xl font-mono">0</p>
                 </div>
                 <div class="bg-white p-5 rounded-3xl border border-blue-50 text-blue-600 shadow-sm">
                     <p class="text-[9px] uppercase opacity-50">มูลค่าคลัง (ทุน)</p>
@@ -131,29 +128,29 @@
     <div id="cart-bar" class="fixed bottom-24 left-4 right-4 bg-white p-5 rounded-[2.5rem] shadow-2xl flex justify-between items-center hidden z-40 border border-blue-50 animate-bounce">
         <div class="flex items-center gap-4">
             <div id="cart-qty" class="bg-blue-600 text-white w-9 h-9 flex items-center justify-center rounded-full text-sm font-bold font-mono">0</div>
-            <div id="cart-total" class="text-2xl font-bold text-[#004A99] tracking-tighter italic font-mono">฿0</div>
+            <div id="cart-total" class="text-2xl font-bold text-[#004A99] tracking-tighter italic">฿0</div>
         </div>
-        <button onclick="openCheckout()" class="btn-touch bg-blue-600 text-white px-10 py-3.5 rounded-2xl font-bold text-sm uppercase shadow-xl">ชำระเงิน</button>
+        <button onclick="openCheckout()" class="btn-touch bg-blue-600 text-white px-10 py-3.5 rounded-2xl font-bold text-sm uppercase shadow-lg">ชำระเงิน</button>
     </div>
 
     <!-- BOTTOM TAB NAVIGATION -->
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-50 flex justify-around p-3 pb-8 z-50 shadow-2xl">
         <button onclick="showPage('report')" id="nav-report" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
-            <span class="text-xl">📊</span><span class="text-[9px] font-bold uppercase">Report</span>
+            <span class="text-xl font-bold">📊</span><span class="text-[9px] font-black uppercase tracking-tighter">Report</span>
         </button>
         <button onclick="showPage('sell')" id="nav-sell" class="flex flex-col items-center gap-1 text-gray-300 tab-active btn-touch">
-            <span class="text-xl">🛒</span><span class="text-[9px] font-bold uppercase">Sell</span>
+            <span class="text-xl font-bold">🛒</span><span class="text-[9px] font-black uppercase tracking-tighter">Sell</span>
         </button>
         <button onclick="showPage('kitchen')" id="nav-kitchen" class="flex flex-col items-center gap-1 text-gray-300 relative btn-touch">
-            <span class="text-xl">👨‍🍳</span><span id="k-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1.5 rounded-full hidden">0</span>
-            <span class="text-[9px] font-bold uppercase">Kitchen</span>
+            <span class="text-xl font-bold">👨‍🍳</span><span id="k-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1.5 rounded-full hidden">0</span>
+            <span class="text-[9px] font-black uppercase tracking-tighter font-bold">Kitchen</span>
         </button>
         <button onclick="showPage('stock')" id="nav-stock" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
-            <span class="text-xl">📦</span><span class="text-[9px] font-bold uppercase">Stock</span>
+            <span class="text-xl font-bold">📦</span><span class="text-[9px] font-black uppercase tracking-tighter font-bold">Stock</span>
         </button>
     </nav>
 
-    <!-- MODAL: MODIFIERS (Teal Style ตามรูป) -->
+    <!-- MODAL: MODIFIERS (Teal Style) -->
     <div id="mod-modal" class="fixed inset-0 bg-black/70 hidden z-[400] flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-5xl rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[95vh] anim-up">
             <!-- Left Side -->
@@ -185,7 +182,7 @@
                     </div>
                 </div>
             </div>
-            <!-- Right Side (Modifiers) -->
+            <!-- Right Side -->
             <div class="p-10 flex-1 bg-gray-50 overflow-y-auto">
                 <h3 class="text-xl font-bold text-teal-800 mb-8 uppercase tracking-widest flex items-center gap-2"><span>✨</span> ตัวเลือกสินค้า</h3>
                 <div id="mod-groups-area" class="space-y-10"></div>
@@ -195,7 +192,6 @@
             </div>
         </div>
     </div>
-
     <!-- MODAL: CHECKOUT -->
     <div id="pay-modal" class="fixed inset-0 bg-black/80 hidden z-[450] flex items-end no-print">
         <div class="bg-white w-full rounded-t-[4rem] p-10 pb-16 shadow-2xl anim-up">
@@ -212,6 +208,11 @@
                 </button>
             </div>
             <div id="box-Cash" class="mb-10 text-center">
+                <div class="flex gap-2 justify-center mb-5 hide-scroll">
+                    <button onclick="fastCash(100)" class="bg-gray-100 px-5 py-3 rounded-2xl font-bold text-sm">฿100</button>
+                    <button onclick="fastCash(500)" class="bg-gray-100 px-5 py-3 rounded-2xl font-bold text-sm">฿500</button>
+                    <button onclick="fastCash(1000)" class="bg-gray-100 px-5 py-3 rounded-2xl font-bold text-sm">฿1000</button>
+                </div>
                 <input type="number" id="cash-in" oninput="calcChange()" placeholder="รับเงินมา..." class="w-full p-8 bg-blue-50 rounded-[3rem] text-5xl text-center font-bold outline-none shadow-inner tracking-tighter text-blue-600">
                 <p class="text-center mt-6 font-bold text-xl uppercase text-gray-400 italic">เงินทอน: <span id="change-txt" class="text-green-600 text-4xl font-mono tracking-tighter ml-2">฿0</span></p>
             </div>
@@ -221,7 +222,7 @@
             </div>
             <div class="flex gap-4">
                 <button onclick="closeCheckout()" class="flex-1 font-bold text-gray-400 py-5 uppercase text-xs tracking-widest">ยกเลิก</button>
-                <button onclick="submitOrder()" class="flex-[2] bg-blue-600 text-white py-5 rounded-[2.5rem] font-bold shadow-2xl btn-touch uppercase tracking-widest">ยืนยันการขาย</button>
+                <button onclick="submitOrder()" class="flex-[2] bg-blue-600 text-white py-5 rounded-[2.5rem] font-bold shadow-2xl uppercase tracking-widest">บันทึกและรับเงิน</button>
             </div>
         </div>
     </div>
@@ -232,21 +233,21 @@
             <h2 class="text-2xl font-bold mb-8 italic text-[#004A99]">ข้อมูลเมนูสินค้า</h2>
             <div class="space-y-4">
                 <div class="flex flex-col items-center">
-                    <img id="admin-preview" class="w-36 h-36 rounded-3xl object-cover bg-gray-100 border shadow-sm mb-3">
-                    <label class="bg-blue-50 text-blue-600 text-[10px] font-bold px-6 py-2.5 rounded-full cursor-pointer uppercase border border-blue-100 btn-touch shadow-sm">+ เลือกรูปภาพ<input type="file" id="img-input" accept="image/*" class="hidden" onchange="previewImg(event)"></label>
+                    <img id="admin-preview" class="w-36 h-36 rounded-3xl object-cover bg-gray-50 border shadow-sm mb-3">
+                    <label class="bg-blue-50 text-blue-600 text-[10px] font-bold px-6 py-2.5 rounded-full cursor-pointer uppercase border border-blue-100 btn-touch shadow-sm">+ เลือกรูปภาพใหม่<input type="file" id="img-input" accept="image/*" class="hidden" onchange="previewImg(event)"></label>
                 </div>
                 <input type="text" id="adm-name" placeholder="ชื่อสินค้า" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
                 <div class="grid grid-cols-2 gap-3">
-                    <input type="number" id="adm-price" placeholder="ราคาขาย" class="p-4 bg-gray-50 rounded-2xl font-bold text-blue-600">
-                    <input type="number" id="adm-cost" placeholder="ต้นทุน" class="p-4 bg-gray-50 rounded-2xl font-bold text-gray-400">
+                    <input type="number" id="adm-price" placeholder="ราคาขาย" class="p-4 bg-gray-50 rounded-2xl font-bold text-blue-600 shadow-inner">
+                    <input type="number" id="adm-cost" placeholder="ต้นทุน" class="p-4 bg-gray-50 rounded-2xl font-bold text-gray-400 shadow-inner">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <input type="number" id="adm-stock" placeholder="สต็อก" class="p-4 bg-gray-50 rounded-2xl">
-                    <input type="text" id="adm-cat" placeholder="หมวดหมู่" class="w-full p-4 bg-gray-50 rounded-2xl">
+                    <input type="number" id="adm-stock" placeholder="สต็อก" class="p-4 bg-gray-50 rounded-2xl shadow-inner">
+                    <input type="text" id="adm-cat" placeholder="หมวดหมู่" class="w-full p-4 bg-gray-50 rounded-2xl shadow-inner">
                 </div>
                 <div class="bg-blue-50 p-6 rounded-3xl border border-blue-100">
-                    <p class="text-[10px] font-bold text-blue-500 mb-3 uppercase italic">ตัวเลือกเสริม (ชื่อ:ราคา, ชื่อ:ราคา)</p>
-                    <input type="text" id="adm-mods" placeholder="เช่น พิเศษ:10, ไข่ดาว:10" class="w-full p-3 bg-white rounded-xl text-xs border-none shadow-sm">
+                    <p class="text-[10px] font-bold text-blue-500 mb-3 uppercase italic">ตัวเลือกย่อย (ชื่อ:ราคา, ชื่อ:ราคา)</p>
+                    <input type="text" id="adm-mods" placeholder="เช่น พิเศษ:10, ไข่ดาว:10" class="w-full p-3 bg-white rounded-xl text-xs border-none outline-none shadow-sm">
                 </div>
                 <div class="flex gap-4 pt-4">
                     <button onclick="closeAdminModal()" class="flex-1 font-bold text-gray-400 py-4 uppercase text-xs">ปิด</button>
@@ -283,7 +284,10 @@
         db.ref('currentShift').on('value', snap => {
             curShift = snap.val();
             if(!curShift || curShift.status === 'closed') document.getElementById('shift-guard').classList.remove('hidden');
-            else document.getElementById('shift-guard').classList.add('hidden');
+            else {
+                document.getElementById('shift-guard').classList.add('hidden');
+                document.getElementById('shift-label').innerText = "Shift: ฿" + curShift.startCash;
+            }
         });
 
         // --- 2. SHIFT LOGIC ---
@@ -357,12 +361,12 @@
 
         function toggleMod(el, name, price, isSingle) {
             if(isSingle) {
-                el.parentElement.querySelectorAll('div').forEach(x => x.classList.remove('opt-selected'));
+                el.parentElement.querySelectorAll('div').forEach(x => x.classList.remove('mod-selected'));
                 chosenMods = chosenMods.filter(m => !['S','M','L','เล็ก','กลาง','ใหญ่'].includes(m.name));
             }
             const idx = chosenMods.findIndex(m => m.name === name);
-            if (idx > -1) { chosenMods.splice(idx, 1); el.classList.remove('opt-selected'); }
-            else { chosenMods.push({ name, price }); el.classList.add('opt-selected'); }
+            if (idx > -1) { chosenMods.splice(idx, 1); el.classList.remove('mod-selected'); }
+            else { chosenMods.push({ name, price }); el.classList.add('mod-selected'); }
             updateModTotal();
         }
 
@@ -446,7 +450,7 @@
             document.getElementById('stk-count').innerText = products.length;
             document.getElementById('stk-value').innerText = `฿${products.reduce((s,p)=>s+((p.cost||0)*(p.stock||0)),0).toLocaleString()}`;
             document.getElementById('admin-list').innerHTML = products.map((p, i) => `
-                <div onclick="editProduct(${i})" class="bg-white p-5 rounded-[2.2rem] flex justify-between items-center border border-blue-50 btn-touch">
+                <div onclick="editProduct(${i})" class="bg-white p-5 rounded-[2.2rem] flex justify-between items-center border border-blue-50 btn-touch card-active">
                     <div class="flex items-center gap-4"><img src="${p.img || ''}" class="w-14 h-14 rounded-2xl object-cover bg-gray-100 shadow-inner">
                     <div><p class="font-bold text-sm text-[#004A99]">${p.name}</p><p class="text-[9px] text-blue-400 uppercase font-bold tracking-widest italic">Stock: ${p.stock||0} | ทุน: ฿${p.cost||0}</p></div></div>
                     <span class="text-blue-600 text-xs font-bold underline italic tracking-tighter">Edit</span>
@@ -474,7 +478,7 @@
             const data = { name: document.getElementById('adm-name').value, price: parseFloat(document.getElementById('adm-price').value)||0, cost: parseFloat(document.getElementById('adm-cost').value)||0, stock: parseInt(document.getElementById('adm-stock').value)||0, category: document.getElementById('adm-cat').value||"ทั่วไป", img: document.getElementById('admin-preview').src, modifiers: document.getElementById('adm-mods').value };
             if(!data.name) return alert("ใส่ชื่อสินค้าด้วยครับ");
             if(editIdx === -1) products.push(data); else products[editIdx] = data;
-            db.ref('products').set(products).then(() => { closeAdminModal(); alert("บันทึกสำเร็จ!"); });
+            db.ref('products').set(products).then(() => { closeAdminModal(); alert("บันทึกเรียบร้อย!"); });
         }
         function deleteProduct() { if(confirm("ลบ?")) { products.splice(editIdx, 1); db.ref('products').set(products); closeAdminModal(); } }
         function resetAdmFields() { ["adm-name","adm-price","adm-cost","adm-stock","adm-cat","adm-mods"].forEach(id => document.getElementById(id).value = ""); document.getElementById('admin-preview').src = ""; }
@@ -492,6 +496,7 @@
             document.getElementById('rep-total').innerText = "฿"+total.toLocaleString();
             document.getElementById('rep-profit').innerText = "฿"+(total - cost).toLocaleString();
             document.getElementById('rep-tax').innerText = "฿"+(total * 0.07).toLocaleString();
+            document.getElementById('rep-cost').innerText = "฿"+cost.toLocaleString();
             renderChart(filtered);
         }
 
@@ -512,8 +517,6 @@
         }
 
         function closeMod() { document.getElementById('mod-modal').classList.add('hidden'); }
-        function setRepRange(r) { repRange = r; updateStats(r); }
-
         showPage('sell');
     </script>
 </body>
