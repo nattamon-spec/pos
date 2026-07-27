@@ -3,82 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>เลื่องชื่อลือชา POS - Cloud Fix</title>
-    <!-- ใช้ Firebase เวอร์ชันเสถียรที่สุด -->
+    <title>เลื่องชื่อลือชา POS Pro</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Kanit', sans-serif; background: #f3f4f6; }
-        .tab-active { color: #ef4444 !important; font-weight: bold; border-top: 3px solid #ef4444; }
+        body { font-family: 'Kanit', sans-serif; background: #f8fafc; }
+        .active-tab { color: #ef4444 !important; border-top: 3px solid #ef4444; }
         .btn-tap:active { transform: scale(0.95); transition: 0.1s; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="bg-gray-50 pb-24">
+<body class="pb-24">
 
-    <!-- แถบสถานะด้านบนสุด -->
-    <div id="debug-info" class="bg-black text-[8px] text-white p-1 text-center font-mono">Status: Initializing...</div>
-
+    <!-- Header -->
     <header class="bg-white p-4 flex justify-between items-center shadow-sm sticky top-0 z-40">
         <h1 class="text-xl font-bold text-red-600 italic">เลื่องชื่อลือชา <span class="text-[10px] text-gray-400 font-normal">POS PRO</span></h1>
-        <div id="db-status" class="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded-full font-bold uppercase tracking-tighter italic">Offline</div>
+        <div id="db-status" class="text-[10px] px-2 py-1 rounded-full font-bold bg-yellow-100 text-yellow-600">Connecting...</div>
     </header>
 
-    <div id="content" class="min-h-screen">
-        <!-- หน้า POS (แสดงเป็นหน้าแรก) -->
-        <section id="page-pos" class="p-3">
-            <div id="pos-grid" class="grid grid-cols-2 gap-3 mb-32 text-center py-10 text-gray-400">
-                รอเชื่อมต่อฐานข้อมูล...
+    <!-- Pages -->
+    <div id="main-content" class="min-h-screen">
+        
+        <!-- 1. REPORT -->
+        <section id="page-report" class="p-4 hidden">
+            <h2 class="font-bold text-lg mb-4">สรุปยอดขายวันนี้</h2>
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 text-center">
+                    <div class="text-[10px] text-gray-400 font-bold uppercase mb-1">ยอดขาย</div>
+                    <div id="stat-total" class="text-2xl font-bold text-red-600">฿0</div>
+                </div>
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 text-center">
+                    <div class="text-[10px] text-gray-400 font-bold uppercase mb-1">บิล</div>
+                    <div id="stat-count" class="text-2xl font-bold text-blue-600">0</div>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border flex justify-center">
+                <canvas id="salesChart" style="max-width: 250px;"></canvas>
             </div>
         </section>
 
-        <!-- หน้าห้องครัว -->
-        <section id="page-kitchen" class="p-4 hidden space-y-4">
+        <!-- 2. SELL (POS) -->
+        <section id="page-sell" class="p-3">
+            <div class="mb-4">
+                <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนู..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none">
+            </div>
+            <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-24"></div>
+        </section>
+
+        <!-- 3. KITCHEN -->
+        <section id="page-kitchen" class="p-4 hidden">
+            <h2 class="font-bold text-lg mb-4 uppercase text-gray-400 text-xs tracking-widest">ออเดอร์รอทำ</h2>
             <div id="kitchen-list" class="space-y-4"></div>
         </section>
 
-        <!-- หน้าสรุปยอด -->
-        <section id="page-dashboard" class="p-4 hidden">
-            <div class="bg-white p-6 rounded-3xl shadow-sm text-center border">
-                <div class="text-xs text-gray-400 mb-1">ยอดขายวันนี้</div>
-                <div id="stat-total" class="text-3xl font-bold text-red-600">฿0</div>
-            </div>
-        </section>
-
-        <!-- หน้าสต็อก/จัดการ -->
-        <section id="page-admin" class="p-4 hidden space-y-6">
-            <div class="bg-red-50 p-5 rounded-3xl border-2 border-red-200 text-center">
-                <button onclick="seedData()" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold btn-tap shadow-lg">✨ คลิกเพื่อติดตั้งสินค้า</button>
+        <!-- 4. STOCK (ADMIN) -->
+        <section id="page-stock" class="p-4 hidden space-y-6">
+            <div class="bg-red-50 p-5 rounded-3xl border-2 border-red-200 text-center shadow-sm">
+                <h3 class="text-red-600 font-bold mb-2 text-sm">จัดการระบบ</h3>
+                <button onclick="seedData()" class="w-full bg-red-600 text-white py-3 rounded-2xl font-bold btn-tap shadow-lg">✨ เริ่มระบบ/ติดตั้งสินค้า</button>
             </div>
             <div class="bg-white p-5 rounded-3xl shadow-sm border">
-                <h3 class="font-bold text-sm mb-2">PromptPay No.</h3>
+                <h3 class="font-bold text-sm mb-3">PromptPay No.</h3>
                 <input type="text" id="pp-input" onchange="savePP()" placeholder="ใส่เบอร์รับเงิน" class="w-full p-4 bg-gray-50 rounded-2xl border-none">
             </div>
-            <div id="admin-product-list" class="space-y-3"></div>
+            <div id="stock-list" class="space-y-3"></div>
         </section>
     </div>
 
-    <!-- เมนูแท็บด้านล่าง -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-2 pb-5 z-50 shadow-2xl">
-        <button onclick="showPage('pos')" id="nav-pos" class="flex flex-col items-center gap-1 text-gray-400 tab-active">
-            <span class="text-xl">🛒</span><span class="text-[9px] font-bold">ขาย</span>
+    <!-- Cart Bar -->
+    <div id="cart-bar" class="fixed bottom-20 left-4 right-4 bg-red-600 text-white p-4 rounded-3xl shadow-2xl flex justify-between items-center hidden z-40">
+        <div class="flex items-center gap-3">
+            <div id="cart-qty" class="bg-white/20 px-3 py-1 rounded-lg font-bold text-sm">0</div>
+            <div id="cart-total" class="text-xl font-bold">฿0</div>
+        </div>
+        <button onclick="openPay()" class="bg-white text-red-600 px-6 py-2 rounded-2xl font-bold btn-tap shadow-md">ชำระเงิน</button>
+    </div>
+
+    <!-- Bottom Nav (เหมือน MuayMoney) -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-2 pb-6 z-50">
+        <button onclick="showPage('report')" id="nav-report" class="flex flex-col items-center gap-1 text-gray-400">
+            <span class="text-xl">📊</span><span class="text-[10px] font-bold uppercase">Report</span>
         </button>
-        <button onclick="showPage('kitchen')" id="nav-kitchen" class="flex flex-col items-center gap-1 text-gray-400">
-            <span class="text-xl relative">👨‍🍳<span id="k-badge" class="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] px-1 rounded-full hidden">0</span></span>
-            <span class="text-[9px] font-bold">ห้องครัว</span>
+        <button onclick="showPage('sell')" id="nav-sell" class="flex flex-col items-center gap-1 text-gray-400 active-tab">
+            <span class="text-xl">🛒</span><span class="text-[10px] font-bold uppercase">Sell</span>
         </button>
-        <button onclick="showPage('dashboard')" id="nav-dashboard" class="flex flex-col items-center gap-1 text-gray-400">
-            <span class="text-xl">📊</span><span class="text-[9px] font-bold">สรุปยอด</span>
+        <button onclick="showPage('kitchen')" id="nav-kitchen" class="flex flex-col items-center gap-1 text-gray-400 relative">
+            <span class="text-xl">👨‍🍳</span><span class="text-[10px] font-bold uppercase">Kitchen</span>
+            <span id="k-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] px-1.5 rounded-full hidden">0</span>
         </button>
-        <button onclick="showPage('admin')" id="nav-admin" class="flex flex-col items-center gap-1 text-gray-400">
-            <span class="text-xl">⚙️</span><span class="text-[9px] font-bold">คลัง</span>
+        <button onclick="showPage('stock')" id="nav-stock" class="flex flex-col items-center gap-1 text-gray-400">
+            <span class="text-xl">📦</span><span class="text-[10px] font-bold uppercase">Stock</span>
         </button>
     </nav>
 
+    <!-- Payment Modal -->
+    <div id="pay-modal" class="fixed inset-0 bg-black/95 hidden z-[100] flex flex-col items-center justify-center p-6 text-white text-center">
+        <div id="pay-amount" class="text-7xl font-bold text-yellow-400 mb-10 tracking-tighter">฿0</div>
+        <div id="qr-box" class="bg-white p-4 rounded-3xl mb-10 hidden">
+            <img id="qr-img" class="w-60 h-60 mx-auto">
+            <p class="text-black text-[10px] font-bold mt-2">สแกนเพื่อจ่าย</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4 w-full max-w-sm">
+            <button onclick="submitOrder('Cash')" class="bg-white/10 border border-white/20 py-8 rounded-3xl btn-tap">💵 เงินสด</button>
+            <button onclick="generateQR()" class="bg-blue-600 py-8 rounded-3xl btn-tap">📱 โอนเงิน</button>
+        </div>
+        <button onclick="closePay()" class="mt-12 text-gray-500 font-bold uppercase text-xs tracking-widest">ยกเลิก</button>
+    </div>
+
     <script>
-        // --- ส่วนรหัสเชื่อมต่อ (ตรวจสอบให้ดี) ---
         const firebaseConfig = {
             apiKey: "AIzaSyAvqnQ-j9nDKuXfmDe7Jr28cJcydnKxcjM",
             authDomain: "leungcheuluecha.firebaseapp.com",
@@ -89,83 +124,106 @@
             appId: "1:497959094385:web:bf9c2a804d99af0eba33d0"
         };
 
-        // เริ่มต้น Firebase พร้อมดัก Error
-        try {
-            firebase.initializeApp(firebaseConfig);
-            document.getElementById('debug-info').innerText = "Status: Firebase Initialized";
-        } catch (e) {
-            document.getElementById('debug-info').innerText = "Error: " + e.message;
-        }
-
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        let products = [], orders = [], settings = { promptpay: "" };
+        let products = [], orders = [], settings = { promptpay: "" }, cart = [], salesData = { Cash: 0, Transfer: 0 };
 
-        // ตรวจสอบการเชื่อมต่อจริง
+        // Connection Status
         db.ref('.info/connected').on('value', s => {
             const st = document.getElementById('db-status');
-            if(s.val() === true) {
+            if(s.val()) {
                 st.innerText = "● ONLINE";
-                st.className = "text-[10px] bg-green-100 text-green-600 px-2 py-1 rounded-full font-bold";
-                document.getElementById('debug-info').innerText = "Status: Connected to Cloud";
+                st.className = "text-[10px] px-2 py-1 rounded-full font-bold bg-green-100 text-green-600";
             } else {
-                st.innerText = "● OFFLINE";
-                st.className = "text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded-full font-bold";
+                st.innerText = "Connecting...";
+                st.className = "text-[10px] px-2 py-1 rounded-full font-bold bg-yellow-100 text-yellow-600";
             }
         });
 
-        // ดึงข้อมูลสินค้า
-        db.ref('products').on('value', snap => {
-            products = snap.val() || [];
-            renderPOS();
-            renderAdmin();
-        }, e => {
-            document.getElementById('debug-info').innerText = "Read Error: " + e.message;
+        // Real-time Data
+        db.ref('products').on('value', snap => { products = snap.val() || []; renderPOS(); renderStock(); });
+        db.ref('settings').on('value', snap => { settings = snap.val() || { promptpay: "" }; document.getElementById('pp-input').value = settings.promptpay; });
+        db.ref('orders').on('value', snap => { 
+            const data = snap.val() || {}; 
+            orders = Object.keys(data).map(k => ({ key: k, ...data[k] })); 
+            renderKitchen(); 
+            calculateReports();
         });
-
-        // ดึงออเดอร์
-        db.ref('orders').on('value', snap => {
-            const data = snap.val() || {};
-            orders = Object.keys(data).map(k => ({ key: k, ...data[k] }));
-            renderKitchen();
-        });
-
-        function renderPOS() {
-            const grid = document.getElementById('pos-grid');
-            if(products.length === 0) {
-                grid.innerHTML = '<div class="col-span-2 py-20 text-gray-400">ยังไม่มีสินค้า<br>กรุณาไปที่หน้า "คลัง" เพื่อติดตั้ง</div>';
-                return;
-            }
-            grid.innerHTML = products.map((p, i) => `
-                <div onclick="addToCart(${i})" class="bg-white p-2 rounded-3xl shadow-sm border border-gray-100 btn-tap">
-                    <img src="${p.img}" class="w-full h-24 object-cover rounded-2xl mb-2">
-                    <div class="font-bold text-xs truncate px-1">${p.name}</div>
-                    <div class="text-red-600 font-bold text-sm">฿${p.price}</div>
-                </div>
-            `).join('');
-        }
 
         function showPage(p) {
             document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
             document.getElementById('page-'+p).classList.remove('hidden');
-            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
-            document.getElementById('nav-'+p).classList.add('tab-active');
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active-tab'));
+            document.getElementById('nav-'+p).classList.add('active-tab');
+            updateCart();
+            if(p === 'report') renderChart();
         }
 
-        function seedData() {
-            if(!confirm("ต้องการติดตั้งสินค้าเริ่มต้นหรือไม่?")) return;
-            const data = [
-                { name: "ข้าวมันไก่ต้ม", price: 50, stock: 50, img: "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=300", category: "อาหาร" },
-                { name: "ข้าวมันไก่ทอด", price: 55, stock: 50, img: "https://images.unsplash.com/photo-1562967914-608f82629710?w=300", category: "อาหาร" },
-                { name: "น้ำเก๊กฮวย", price: 15, stock: 100, img: "https://images.unsplash.com/photo-1543257580-7269da773bf5?w=300", category: "เครื่องดื่ม" }
-            ];
-            db.ref('products').set(data).then(() => alert("ติดตั้งสินค้าแล้ว!")).catch(e => alert("Error: " + e.message));
+        function renderPOS() {
+            const grid = document.getElementById('pos-grid');
+            const search = document.getElementById('search').value.toLowerCase();
+            const filtered = products.filter(p => p.name.toLowerCase().includes(search));
+            grid.innerHTML = filtered.map((p, i) => `
+                <div onclick="addToCart(${products.indexOf(p)})" class="bg-white p-2 rounded-3xl shadow-sm border btn-tap ${p.stock <= 0 ? 'opacity-30 pointer-events-none' : ''}">
+                    <img src="${p.img}" class="w-full h-24 object-cover rounded-2xl mb-2 pointer-events-none">
+                    <div class="font-bold text-xs truncate pointer-events-none">${p.name}</div>
+                    <div class="flex justify-between items-center mt-1 pointer-events-none">
+                        <span class="text-red-600 font-bold text-xs">฿${p.price}</span>
+                        <span class="text-[8px] text-gray-400 font-bold">คงเหลือ ${p.stock}</span>
+                    </div>
+                </div>`).join('');
         }
 
-        // ฟังชันอื่นๆ ถูกย่อไว้เพื่อความกะทัดรัด แต่อยู่ในไฟล์เดียวกัน
-        function renderKitchen() { /* โค้ดห้องครัว */ }
-        function renderAdmin() { /* โค้ดคลัง */ }
-        
-        showPage('pos');
-    </script>
-</body>
-</html>
+        function addToCart(idx) { cart.push({ ...products[idx], pid: idx }); updateCart(); }
+
+        function updateCart() {
+            const bar = document.getElementById('cart-bar');
+            if(cart.length > 0 && !document.getElementById('page-sell').classList.contains('hidden')) {
+                bar.classList.remove('hidden');
+                const total = cart.reduce((s, i) => s + i.price, 0);
+                document.getElementById('cart-qty').innerText = cart.length;
+                document.getElementById('cart-total').innerText = "฿" + total.toLocaleString();
+            } else bar.classList.add('hidden');
+        }
+
+        function openPay() {
+            const total = cart.reduce((s, i) => s + i.price, 0);
+            document.getElementById('pay-amount').innerText = "฿" + total.toLocaleString();
+            document.getElementById('pay-modal').classList.remove('hidden');
+        }
+
+        function generateQR() {
+            if(!settings.promptpay) return alert("กรุณาตั้งค่าเบอร์ที่หน้า Stock");
+            const total = cart.reduce((s, i) => s + i.price, 0);
+            document.getElementById('qr-img').src = "https://promptpay.io/" + settings.promptpay + "/" + total + ".png";
+            document.getElementById('qr-box').classList.remove('hidden');
+        }
+
+        function submitOrder(method) {
+            const total = cart.reduce((s, i) => s + i.price, 0);
+            db.ref('orders').push({ items: cart, total, method, status: 'pending', date: new Date().toLocaleDateString() });
+            cart.forEach(item => { db.ref('products/'+item.pid+'/stock').transaction(s => Math.max(0, (s || 0) - 1)); });
+            alert("สั่งอาหารแล้ว!"); cart = []; updateCart(); closePay();
+        }
+
+        function renderKitchen() {
+            const container = document.getElementById('kitchen-list');
+            const pending = orders.filter(o => o.status === 'pending');
+            document.getElementById('k-badge').innerText = pending.length;
+            document.getElementById('k-badge').classList.toggle('hidden', pending.length === 0);
+            container.innerHTML = pending.reverse().map(o => `
+                <div class="bg-white p-5 rounded-3xl shadow-sm border-l-8 border-red-500">
+                    <div class="flex justify-between mb-4">
+                        <span class="text-[10px] font-bold text-gray-400">#${o.key.slice(-4)}</span>
+                        <span class="bg-gray-100 px-3 py-1 rounded-full text-[9px] font-bold text-red-500 uppercase">${o.method}</span>
+                    </div>
+                    <div class="space-y-2 mb-6">${o.items.map(i => `<div class="font-bold text-lg">● ${i.name}</div>`).join('')}</div>
+                    <button onclick="finishOrder('${o.key}')" class="w-full bg-green-600 text-white py-4 rounded-2xl font-bold btn-tap uppercase tracking-widest text-xs">เสร็จแล้ว</button>
+                </div>`).join('') || '<div class="text-center py-20 text-gray-400 italic">ไม่มีรายการอาหาร</div>';
+        }
+
+        function finishOrder(key) { db.ref('orders/'+key).update({ status: 'done' }); }
+
+        function calculateReports() {
+            const today = new Date().toLocaleDateString();
+            const todayOrders = orders.filt
