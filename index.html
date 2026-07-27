@@ -3,276 +3,333 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MuayMoney Clone - Professional POS System</title>
+    <title>MuayMoney Pro - Ultimate Beverage POS</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Kanit', sans-serif; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .product-card:active { transform: scale(0.95); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .active-tab { border-bottom: 4px solid #3b82f6; color: #3b82f6; }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-slate-50">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- Mock Data ---
-        const CATEGORIES = ["ทั้งหมด", "กาแฟ", "ชา", "เบเกอรี่", "อาหาร"];
-        const INITIAL_PRODUCTS = [
-            { id: 1, name: "เอสเพรสโซ่", price: 55, category: "กาแฟ", stock: 50, image: "☕" },
-            { id: 2, name: "อเมริกาโน่", price: 50, category: "กาแฟ", stock: 40, image: "☕" },
-            { id: 3, name: "ลาเต้", price: 65, category: "กาแฟ", stock: 30, image: "🥛" },
-            { id: 4, name: "ชาไทย", price: 45, category: "ชา", stock: 100, image: "🍂" },
-            { id: 5, name: "ชาเขียวมัทฉะ", price: 60, category: "ชา", stock: 20, image: "🍵" },
-            { id: 6, name: "ครัวซองต์", price: 85, category: "เบเกอรี่", stock: 15, image: "🥐" },
-            { id: 7, name: "เค้กช็อกโกแลต", price: 120, category: "เบเกอรี่", stock: 10, image: "🍰" },
-            { id: 8, name: "ข้าวผัดกะเพรา", price: 79, category: "อาหาร", stock: 25, image: "🍳" },
+        // --- Configuration & Mock Data ---
+        const PRODUCTS = [
+            { id: 'p1', name: 'ชาไทย', price: 45, category: 'Tea', image: '🥤' },
+            { id: 'p2', name: 'ชาเขียว', price: 45, category: 'Tea', image: '🍵' },
+            { id: 'p3', name: 'โกโก้', price: 50, category: 'Cocoa', image: '🍫' },
+            { id: 'p4', name: 'นมสด', price: 40, category: 'Milk', image: '🥛' },
+            { id: 'p5', name: 'โอริโอ้ปั่น', price: 65, category: 'Smoothie', image: '🍪' },
+            { id: 'p6', name: 'ชาพีช', price: 55, category: 'Tea', image: '🍑' },
         ];
 
+        const MODIFIERS = {
+            sizes: [
+                { label: 'S', price: 0 },
+                { label: 'M', price: 10 },
+                { label: 'L', price: 20 }
+            ],
+            sweetness: ['0%', '25%', '50%', '100%'],
+            toppings: [
+                { label: 'วิปครีม', price: 15 },
+                { label: 'ครีมชีส', price: 20 },
+                { label: 'ชีสขูด', price: 15 },
+                { label: 'ช็อคขูด', price: 10 },
+                { label: 'ดับเบิลชีส', price: 35 }
+            ]
+        };
+
         function App() {
-            const [products, setProducts] = useState(INITIAL_PRODUCTS);
+            // --- States ---
+            const [view, setView] = useState('pos'); // pos, kds, inventory, reports
             const [cart, setCart] = useState([]);
-            const [category, setCategory] = useState("ทั้งหมด");
-            const [search, setSearch] = useState("");
-            const [isShiftOpen, setIsShiftOpen] = useState(false);
+            const [orders, setOrders] = useState(JSON.parse(localStorage.getItem('orders')) || []);
+            const [selectedProduct, setSelectedProduct] = useState(null);
             const [showPayment, setShowPayment] = useState(false);
-            const [cashReceived, setCashReceived] = useState("");
-            const [shiftData, setShiftData] = useState({ startCash: 0, startTime: null });
+            const [orderType, setOrderType] = useState('หน้าร้าน');
+            const [branch, setBranch] = useState('สาขาหลัก');
 
-            // --- Logic ---
-            const filteredProducts = products.filter(p => 
-                (category === "ทั้งหมด" || p.category === category) &&
-                p.name.toLowerCase().includes(search.toLowerCase())
-            );
+            // --- Persistence ---
+            useEffect(() => {
+                localStorage.setItem('orders', JSON.stringify(orders));
+            }, [orders]);
 
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-            const addToCart = (product) => {
-                if (!isShiftOpen) return alert("กรุณาเปิดกะก่อนเริ่มการขาย");
-                const existing = cart.find(item => item.id === product.id);
-                if (existing) {
-                    setCart(cart.map(item => item.id === product.id ? {...item, quantity: item.quantity + 1} : item));
-                } else {
-                    setCart([...cart, { ...product, quantity: 1 }]);
-                }
+            // --- POS Logic ---
+            const addToCart = (customItem) => {
+                setCart([...cart, { ...customItem, tempId: Date.now() }]);
+                setSelectedProduct(null);
             };
 
-            const updateQty = (id, delta) => {
-                setCart(cart.map(item => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item));
+            const removeFromCart = (tempId) => {
+                setCart(cart.filter(item => item.tempId !== tempId));
             };
 
-            const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id));
+            const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
 
-            const handlePayment = (type) => {
-                if (type === 'CASH' && parseFloat(cashReceived) < subtotal) return alert("เงินสดไม่พอ");
-                
-                // ตัดสต็อก (Simulate)
-                const newProducts = products.map(p => {
-                    const cartItem = cart.find(c => c.id === p.id);
-                    return cartItem ? { ...p, stock: p.stock - cartItem.quantity } : p;
-                });
-                
-                setProducts(newProducts);
-                alert("ชำระเงินสำเร็จ! กำลังพิมพ์ใบเสร็จ...");
+            const completeOrder = (paymentMethod) => {
+                const newOrder = {
+                    id: `INV-${Date.now()}`,
+                    items: cart,
+                    total: subtotal,
+                    type: orderType,
+                    payment: paymentMethod,
+                    status: 'PENDING', // PENDING -> PREPARING -> READY
+                    timestamp: new Date().toISOString(),
+                    branch: branch
+                };
+                setOrders([newOrder, ...orders]);
                 setCart([]);
                 setShowPayment(false);
-                setCashReceived("");
+                alert("สั่งซื้อสำเร็จ! ออเดอร์ส่งไปที่ครัวแล้ว");
             };
 
-            // --- UI Components ---
+            // --- KDS Logic ---
+            const updateOrderStatus = (orderId, nextStatus) => {
+                setOrders(orders.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
+            };
+
+            // --- Views ---
+            const Sidebar = () => (
+                <div className="w-20 bg-indigo-900 h-screen flex flex-col items-center py-8 text-white space-y-10 shadow-xl">
+                    <div className="font-black text-2xl italic">MM</div>
+                    <button onClick={() => setView('pos')} className={`p-3 rounded-xl transition ${view === 'pos' ? 'bg-indigo-700' : 'hover:bg-indigo-800'}`}>
+                        <i data-lucide="layout-grid"></i>
+                    </button>
+                    <button onClick={() => setView('kds')} className={`p-3 rounded-xl transition ${view === 'kds' ? 'bg-indigo-700' : 'hover:bg-indigo-800'}`}>
+                        <i data-lucide="chef-hat"></i>
+                    </button>
+                    <button onClick={() => setView('inventory')} className={`p-3 rounded-xl transition ${view === 'inventory' ? 'bg-indigo-700' : 'hover:bg-indigo-800'}`}>
+                        <i data-lucide="package"></i>
+                    </button>
+                    <button onClick={() => setView('reports')} className={`p-3 rounded-xl transition ${view === 'reports' ? 'bg-indigo-700' : 'hover:bg-indigo-800'}`}>
+                        <i data-lucide="bar-chart-3"></i>
+                    </button>
+                </div>
+            );
+
+            const POSView = () => (
+                <div className="flex-1 flex overflow-hidden">
+                    {/* Product Grid */}
+                    <div className="flex-1 p-6 overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex space-x-2">
+                                {['หน้าร้าน', 'ออกบูธ', 'Event', 'เดลิเวอรี่'].map(t => (
+                                    <button 
+                                        key={t}
+                                        onClick={() => setOrderType(t)}
+                                        className={`px-4 py-2 rounded-full text-sm font-bold ${orderType === t ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 shadow-sm'}`}
+                                    >
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="text-slate-500 font-medium">{branch}</div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {PRODUCTS.map(p => (
+                                <div 
+                                    key={p.id}
+                                    onClick={() => setSelectedProduct(p)}
+                                    className="bg-white p-4 rounded-3xl shadow-sm hover:shadow-md cursor-pointer transition-all border-2 border-transparent active:border-indigo-500"
+                                >
+                                    <div className="text-4xl mb-3">{p.image}</div>
+                                    <div className="font-bold text-slate-800">{p.name}</div>
+                                    <div className="text-indigo-600 font-black">฿{p.price}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Cart Sidebar */}
+                    <div className="w-96 bg-white border-l shadow-lg flex flex-col">
+                        <div className="p-6 border-b font-bold text-xl flex items-center">
+                            <i data-lucide="shopping-cart" className="mr-2"></i> ตะกร้าสินค้า
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {cart.map(item => (
+                                <div key={item.tempId} className="flex justify-between items-start bg-slate-50 p-3 rounded-2xl">
+                                    <div>
+                                        <div className="font-bold text-sm">{item.name} ({item.size})</div>
+                                        <div className="text-xs text-slate-500">หวาน {item.sweetness} | {item.toppings.join(', ') || 'ไม่เพิ่มท็อปปิ้ง'}</div>
+                                        <div className="text-indigo-600 font-bold text-sm mt-1">฿{item.totalPrice}</div>
+                                    </div>
+                                    <button onClick={() => removeFromCart(item.tempId)} className="text-red-400 hover:text-red-600">
+                                        <i data-lucide="x-circle" size="18"></i>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-6 bg-slate-50 border-t space-y-4">
+                            <div className="flex justify-between text-2xl font-black">
+                                <span>รวมทั้งสิ้น</span>
+                                <span className="text-indigo-600">฿{subtotal}</span>
+                            </div>
+                            <button 
+                                disabled={cart.length === 0}
+                                onClick={() => setShowPayment(true)}
+                                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 disabled:bg-slate-300 transition-all"
+                            >
+                                ชำระเงิน
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const KDSView = () => {
+                const pendingOrders = orders.filter(o => o.status !== 'COMPLETED');
+                return (
+                    <div className="flex-1 p-6 overflow-y-auto">
+                        <h2 className="text-2xl font-bold mb-6 flex items-center">
+                            <i data-lucide="monitor" className="mr-2"></i> Kitchen Display System (KDS)
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {pendingOrders.map(order => (
+                                <div key={order.id} className={`rounded-3xl shadow-md overflow-hidden border-t-8 ${order.status === 'PENDING' ? 'border-amber-400 bg-white' : 'border-blue-500 bg-blue-50'}`}>
+                                    <div className="p-4 border-b flex justify-between items-center">
+                                        <span className="font-black text-lg">#{order.id.slice(-4)}</span>
+                                        <span className="text-xs font-bold px-2 py-1 bg-slate-100 rounded-full">{order.type}</span>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        {order.items.map((item, idx) => (
+                                            <div key={idx} className="border-b border-dashed pb-2">
+                                                <div className="font-bold">{item.name} <span className="text-indigo-600">[{item.size}]</span></div>
+                                                <div className="text-sm text-slate-600">หวาน: {item.sweetness}</div>
+                                                {item.toppings.length > 0 && <div className="text-xs text-orange-600 font-medium">เพิ่ม: {item.toppings.join(', ')}</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="p-4 bg-white/50">
+                                        {order.status === 'PENDING' ? (
+                                            <button onClick={() => updateOrderStatus(order.id, 'PREPARING')} className="w-full py-3 bg-amber-500 text-white rounded-xl font-bold">เริ่มทำน้ำ</button>
+                                        ) : (
+                                            <button onClick={() => updateOrderStatus(order.id, 'COMPLETED')} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold">เสร็จสิ้น</button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Modals ---
+            const ModifierModal = () => {
+                if (!selectedProduct) return null;
+                const [size, setSize] = useState('M');
+                const [sweet, setSweet] = useState('100%');
+                const [tops, setTops] = useState([]);
+
+                const currentPrice = selectedProduct.price + 
+                    (MODIFIERS.sizes.find(s => s.label === size).price) +
+                    tops.reduce((sum, t) => sum + MODIFIERS.toppings.find(mt => mt.label === t).price, 0);
+
+                return (
+                    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl">
+                            <div className="p-6 border-b flex justify-between items-center">
+                                <h3 className="text-xl font-bold">{selectedProduct.name}</h3>
+                                <button onClick={() => setSelectedProduct(null)} className="text-slate-400 text-2xl">&times;</button>
+                            </div>
+                            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                                <div>
+                                    <label className="block font-bold mb-3 text-slate-700">ขนาดแก้ว</label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {MODIFIERS.sizes.map(s => (
+                                            <button key={s.label} onClick={() => setSize(s.label)} className={`py-3 rounded-2xl font-bold border-2 transition ${size === s.label ? 'border-indigo-600 bg-indigo-50 text-indigo-600' : 'border-slate-100'}`}>
+                                                {s.label} (+{s.price})
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block font-bold mb-3 text-slate-700">ระดับความหวาน</label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {MODIFIERS.sweetness.map(sw => (
+                                            <button key={sw} onClick={() => setSweet(sw)} className={`py-2 rounded-xl text-sm font-bold border-2 transition ${sweet === sw ? 'border-indigo-600 bg-indigo-50 text-indigo-600' : 'border-slate-100'}`}>
+                                                {sw}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block font-bold mb-3 text-slate-700">ท็อปปิ้ง</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {MODIFIERS.toppings.map(t => (
+                                            <button 
+                                                key={t.label} 
+                                                onClick={() => tops.includes(t.label) ? setTops(tops.filter(x => x !== t.label)) : setTops([...tops, t.label])}
+                                                className={`py-3 px-4 rounded-2xl text-left font-medium border-2 transition flex justify-between items-center ${tops.includes(t.label) ? 'border-indigo-600 bg-indigo-50 text-indigo-600' : 'border-slate-100'}`}
+                                            >
+                                                <span>{t.label}</span>
+                                                <span className="text-xs">+฿{t.price}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-6 bg-slate-50 flex gap-4">
+                                <button 
+                                    onClick={() => addToCart({ ...selectedProduct, size, sweetness: sweet, toppings: tops, totalPrice: currentPrice })}
+                                    className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg shadow-lg"
+                                >
+                                    เพิ่มลงตะกร้า ฿{currentPrice}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const PaymentModal = () => {
+                if (!showPayment) return null;
+                return (
+                    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl">
+                            <div className="p-8 text-center">
+                                <div className="text-slate-500 mb-2">ยอดชำระทั้งหมด</div>
+                                <div className="text-5xl font-black text-indigo-600 mb-8">฿{subtotal}</div>
+                                <div className="grid grid-cols-1 gap-4">
+                                    <button onClick={() => completeOrder('CASH')} className="flex items-center justify-between p-5 bg-emerald-50 border-2 border-emerald-500 rounded-2xl text-emerald-700 font-bold">
+                                        <div className="flex items-center"><i data-lucide="banknote" className="mr-3"></i> เงินสด</div>
+                                        <i data-lucide="chevron-right"></i>
+                                    </button>
+                                    <button onClick={() => completeOrder('PROMPTPAY')} className="flex items-center justify-between p-5 bg-blue-50 border-2 border-blue-500 rounded-2xl text-blue-700 font-bold">
+                                        <div className="flex items-center"><i data-lucide="qr-code" className="mr-3"></i> PromptPay / QR</div>
+                                        <i data-lucide="chevron-right"></i>
+                                    </button>
+                                    <button onClick={() => setShowPayment(false)} className="mt-4 text-slate-400 font-bold">ยกเลิก</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Main Render ---
+            useEffect(() => { lucide.createIcons(); }, [view, selectedProduct, showPayment, orders]);
+
             return (
                 <div className="flex h-screen overflow-hidden">
-                    {/* Sidebar */}
-                    <div className="w-20 bg-blue-900 text-white flex flex-col items-center py-6 space-y-8">
-                        <div className="text-2xl font-bold">M</div>
-                        <i className="fa-solid fa-shop text-xl cursor-pointer text-blue-300"></i>
-                        <i className="fa-solid fa-box text-xl cursor-pointer hover:text-blue-300"></i>
-                        <i className="fa-solid fa-chart-line text-xl cursor-pointer hover:text-blue-300"></i>
-                        <i className="fa-solid fa-gear text-xl cursor-pointer hover:text-blue-300"></i>
+                    <Sidebar />
+                    <div className="flex-1 flex flex-col">
+                        {view === 'pos' && <POSView />}
+                        {view === 'kds' && <KDSView />}
+                        {view === 'inventory' && <div className="p-10 text-center text-slate-400">ระบบจัดการสต็อก (Coming Soon)</div>}
+                        {view === 'reports' && <div className="p-10 text-center text-slate-400">ระบบรายงาน (Coming Soon)</div>}
                     </div>
-
-                    {/* Main Content */}
-                    <div className="flex-1 flex flex-col bg-gray-100">
-                        {/* Header */}
-                        <div className="h-16 bg-white border-b px-6 flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <h1 className="text-xl font-bold text-gray-800">MuayMoney POS</h1>
-                                <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">
-                                    {isShiftOpen ? "● กะเปิดอยู่" : "○ กะปิด"}
-                                </div>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                                {!isShiftOpen ? (
-                                    <button onClick={() => {setIsShiftOpen(true); setShiftData({startCash: 1000, startTime: new Date()})}} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">เปิดกะ</button>
-                                ) : (
-                                    <button onClick={() => setIsShiftOpen(false)} className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium">ปิดกะ</button>
-                                )}
-                                <div className="text-right">
-                                    <p className="text-sm font-bold">Admin User</p>
-                                    <p className="text-xs text-gray-500">สาขาหลัก</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* POS Area */}
-                        <div className="flex-1 flex overflow-hidden">
-                            {/* Product Section */}
-                            <div className="flex-1 p-4 flex flex-col">
-                                <div className="flex space-x-2 mb-4 overflow-x-auto hide-scrollbar">
-                                    {CATEGORIES.map(cat => (
-                                        <button 
-                                            key={cat}
-                                            onClick={() => setCategory(cat)}
-                                            className={`px-6 py-2 rounded-full whitespace-nowrap font-medium transition ${category === cat ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-200'}`}
-                                        >
-                                            {cat}
-                                        </button>
-                                    ))}
-                                </div>
-                                
-                                <div className="mb-4 relative">
-                                    <i className="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-gray-400"></i>
-                                    <input 
-                                        type="text" 
-                                        placeholder="ค้นหาสินค้า หรือ ยิงบาร์โค้ด..." 
-                                        className="w-full pl-12 pr-4 py-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500"
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-10">
-                                    {filteredProducts.map(product => (
-                                        <div 
-                                            key={product.id}
-                                            onClick={() => addToCart(product)}
-                                            className="product-card bg-white p-4 rounded-2xl shadow-sm hover:shadow-md cursor-pointer transition-all border-2 border-transparent hover:border-blue-500 relative overflow-hidden"
-                                        >
-                                            <div className="text-4xl mb-2">{product.image}</div>
-                                            <h3 className="font-bold text-gray-800 truncate">{product.name}</h3>
-                                            <p className="text-blue-600 font-bold text-lg">฿{product.price}</p>
-                                            <div className="absolute top-2 right-2 bg-gray-100 px-2 py-1 rounded text-[10px] text-gray-500">
-                                                คงเหลือ: {product.stock}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Cart Section */}
-                            <div className="w-96 bg-white border-l flex flex-col">
-                                <div className="p-4 border-b flex justify-between items-center">
-                                    <h2 className="font-bold text-lg"><i className="fa-solid fa-cart-shopping mr-2"></i>รายการสั่งซื้อ</h2>
-                                    <button onClick={() => setCart([])} className="text-gray-400 hover:text-red-500"><i className="fa-solid fa-trash-can"></i></button>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                    {cart.length === 0 ? (
-                                        <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                            <i className="fa-solid fa-basket-shopping text-5xl mb-2"></i>
-                                            <p>ไม่มีสินค้าในตะกร้า</p>
-                                        </div>
-                                    ) : (
-                                        cart.map(item => (
-                                            <div key={item.id} className="flex justify-between items-center">
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-sm">{item.name}</p>
-                                                    <p className="text-blue-600 text-xs font-bold">฿{item.price * item.quantity}</p>
-                                                </div>
-                                                <div className="flex items-center space-x-3 bg-gray-100 rounded-lg p-1">
-                                                    <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 bg-white rounded shadow-sm text-xs">-</button>
-                                                    <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                                                    <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 bg-white rounded shadow-sm text-xs">+</button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                <div className="p-6 bg-gray-50 border-t space-y-4">
-                                    <div className="flex justify-between text-sm text-gray-600">
-                                        <span>ยอดรวม</span>
-                                        <span>฿{subtotal}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm text-gray-600">
-                                        <span>ภาษี (7%)</span>
-                                        <span>฿{(subtotal * 0.07).toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-2xl font-black text-gray-800">
-                                        <span>รวมทั้งสิ้น</span>
-                                        <span className="text-blue-600">฿{subtotal.toLocaleString()}</span>
-                                    </div>
-                                    <button 
-                                        disabled={cart.length === 0}
-                                        onClick={() => setShowPayment(true)}
-                                        className={`w-full py-4 rounded-2xl font-bold text-lg shadow-lg transition ${cart.length === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'}`}
-                                    >
-                                        ชำระเงิน
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Payment Modal */}
-                    {showPayment && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                            <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl">
-                                <div className="p-6 border-b flex justify-between items-center">
-                                    <h3 className="text-xl font-bold">ชำระเงิน</h3>
-                                    <button onClick={() => setShowPayment(false)} className="text-gray-400 text-2xl">&times;</button>
-                                </div>
-                                <div className="p-6 space-y-6">
-                                    <div className="text-center">
-                                        <p className="text-gray-500">ยอดชำระทั้งหมด</p>
-                                        <p className="text-5xl font-black text-blue-600">฿{subtotal.toLocaleString()}</p>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <button className="flex flex-col items-center p-4 border-2 border-blue-600 rounded-2xl bg-blue-50">
-                                            <i className="fa-solid fa-money-bill-wave text-2xl text-blue-600 mb-2"></i>
-                                            <span className="font-bold">เงินสด</span>
-                                        </button>
-                                        <button className="flex flex-col items-center p-4 border-2 border-gray-100 rounded-2xl hover:border-blue-600 transition">
-                                            <i className="fa-solid fa-qrcode text-2xl text-gray-600 mb-2"></i>
-                                            <span className="font-bold">PromptPay</span>
-                                        </button>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">รับเงินสดมา</label>
-                                        <input 
-                                            type="number" 
-                                            className="w-full text-3xl font-bold p-4 bg-gray-100 rounded-2xl border-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="0.00"
-                                            value={cashReceived}
-                                            onChange={(e) => setCashReceived(e.target.value)}
-                                        />
-                                    </div>
-
-                                    {parseFloat(cashReceived) >= subtotal && (
-                                        <div className="bg-green-50 p-4 rounded-2xl flex justify-between items-center">
-                                            <span className="text-green-700 font-bold">เงินทอน</span>
-                                            <span className="text-2xl font-black text-green-700">฿{(parseFloat(cashReceived) - subtotal).toLocaleString()}</span>
-                                        </div>
-                                    )}
-
-                                    <button 
-                                        onClick={() => handlePayment('CASH')}
-                                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-xl shadow-lg hover:bg-blue-700"
-                                    >
-                                        ยืนยันการชำระเงิน
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <ModifierModal />
+                    <PaymentModal />
                 </div>
             );
         }
