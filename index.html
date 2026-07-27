@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>เลื่องชื่อลือชา POS</title>
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK 8.10.0 -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,16 +13,11 @@
     <style>
         :root { --p-blue: #007AFF; --bg-cream: #FDFBF7; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg-cream); color: #334155; touch-action: manipulation; }
-        
-        /* Visual Feedback & Selection */
         .btn-touch { transition: all 0.2s; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .btn-touch:active { transform: scale(0.95); background-color: rgba(0, 122, 255, 0.1); filter: brightness(0.9); }
-        .item-selected { border: 3px solid var(--p-blue) !important; background-color: #E3F2FD !important; }
-        
+        .btn-touch:active { transform: scale(0.95); background-color: rgba(0, 122, 255, 0.1); }
         .tab-active { color: var(--p-blue) !important; border-top: 4px solid var(--p-blue); font-weight: 600; }
+        .mod-selected { border-color: var(--p-blue) !important; background-color: #E3F2FD !important; }
         .hide-scroll::-webkit-scrollbar { display: none; }
-        
-        /* Animations */
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .anim-up { animation: slideUp 0.3s ease-out; }
     </style>
@@ -32,27 +27,23 @@
     <!-- HEADER -->
     <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-blue-50 shadow-sm">
         <h1 class="text-xl font-bold text-[#004A99]">เลื่องชื่อลือชา</h1>
-        <div id="db-status" class="text-[9px] px-2 py-1 rounded-full font-bold bg-green-50 text-green-500">● ระบบออนไลน์</div>
+        <div id="db-status" class="text-[9px] px-2 py-1 rounded-full font-bold bg-yellow-100 text-yellow-600 italic uppercase">Connecting...</div>
     </header>
 
-    <div id="main-view">
-        
-        <!-- 1. REPORT PAGE -->
+    <div id="main-content">
+        <!-- 1. REPORT -->
         <section id="page-report" class="p-4 hidden">
             <div class="flex gap-2 overflow-x-auto pb-4 hide-scroll">
-                <button onclick="setReportRange('today')" class="range-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold">วันนี้</button>
-                <button onclick="setReportRange('7days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
-                <button onclick="setReportRange('30days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
+                <button onclick="setRepRange('today')" class="range-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold shadow-sm">วันนี้</button>
+                <button onclick="setRepRange('7days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
+                <button onclick="setRepRange('30days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
             </div>
-
-            <!-- Dashboard Cards -->
             <div class="grid grid-cols-1 gap-4 mb-6">
                 <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50">
                     <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">ยอดขายทั้งหมด</p>
                     <h2 id="rep-sales" class="text-5xl font-bold text-blue-600 tracking-tighter">฿0</h2>
                 </div>
             </div>
-
             <div class="grid grid-cols-2 gap-3 mb-6 text-center">
                 <div class="bg-green-50 p-4 rounded-3xl border border-green-100">
                     <p class="text-[9px] text-green-600 font-bold uppercase">กำไรสุทธิ</p>
@@ -63,49 +54,44 @@
                     <p id="rep-tax" class="text-xl font-bold text-orange-700">฿0</p>
                 </div>
             </div>
-
-            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-8">
-                <canvas id="salesChart"></canvas>
-            </div>
-
-            <h3 class="font-bold text-sm mb-4">🛒 รายการบิลล่าสุด</h3>
-            <div id="bill-list" class="space-y-2"></div>
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-8"><canvas id="salesChart"></canvas></div>
         </section>
 
-        <!-- 2. SELL PAGE (POS) -->
-        <section id="page-sell" class="p-4">
+        <!-- 2. SELL (POS) -->
+        <section id="page-sell" class="p-4 block">
             <div class="mb-4">
                 <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนู..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
             </div>
             <div id="pos-cats" class="flex gap-2 overflow-x-auto pb-4 hide-scroll"></div>
             <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-32">
-                <!-- Products -->
+                <div class="col-span-2 py-20 text-center text-gray-300 italic">กำลังโหลดข้อมูลสินค้า...</div>
             </div>
         </section>
 
-        <!-- 3. KITCHEN PAGE -->
+        <!-- 3. KITCHEN -->
         <section id="page-kitchen" class="p-4 hidden">
-            <h2 class="text-xl font-bold mb-6">ออเดอร์ในครัว</h2>
+            <h2 class="text-xl font-bold mb-6">ห้องครัว</h2>
             <div id="kitchen-list" class="space-y-4"></div>
         </section>
 
-        <!-- 4. STOCK PAGE (Visual Control) -->
+        <!-- 4. STOCK -->
         <section id="page-stock" class="p-4 hidden">
             <div class="grid grid-cols-2 gap-3 mb-6">
                 <div class="bg-blue-600 p-4 rounded-3xl text-white shadow-lg">
-                    <p class="text-[9px] font-bold uppercase opacity-70">สินค้าทั้งหมด</p>
+                    <p class="text-[9px] font-bold uppercase opacity-70">สินค้า</p>
                     <p id="stk-count" class="text-2xl font-bold">0</p>
                 </div>
                 <div class="bg-white p-4 rounded-3xl border border-blue-50">
-                    <p class="text-[9px] font-bold uppercase text-gray-400">มูลค่าสต็อก</p>
+                    <p class="text-[9px] font-bold uppercase text-gray-400">มูลค่าคลัง</p>
                     <p id="stk-value" class="text-2xl font-bold text-blue-600">฿0</p>
                 </div>
             </div>
-            <div class="flex justify-between items-center mb-4 px-2">
-                <h3 class="font-bold">รายการสินค้า</h3>
-                <button onclick="openAdminModal()" class="btn-touch bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold">+ เพิ่มสินค้า</button>
+            <div class="flex justify-between items-center mb-6 px-2">
+                <h3 class="font-bold">จัดการเมนู</h3>
+                <button onclick="openAdminModal()" class="btn-touch bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-bold">+ เพิ่มเมนู</button>
             </div>
-            <div id="admin-list" class="space-y-3"></div>
+            <div id="admin-list" class="space-y-3 mb-8"></div>
+            <button onclick="seedData()" class="w-full py-4 text-[10px] text-gray-300 font-bold uppercase italic">✨ คลิกเพื่อติดตั้งสินค้าเริ่มต้น</button>
         </section>
     </div>
 
@@ -135,22 +121,22 @@
         </button>
     </nav>
 
-    <!-- MODAL: MODIFIERS -->
-    <div id="mod-modal" class="fixed inset-0 bg-black/60 hidden z-[60] flex items-end">
+    <!-- MODAL: MODIFIERS (Loyverse Style) -->
+    <div id="mod-modal" class="fixed inset-0 bg-black/60 hidden z-[100] flex items-end">
         <div class="bg-white w-full rounded-t-[3rem] p-8 max-h-[85vh] overflow-y-auto anim-up">
             <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
-            <h3 id="mod-p-name" class="text-2xl font-bold mb-1">เมนูสินค้า</h3>
-            <p id="mod-p-price" class="text-blue-600 font-bold mb-6">฿0</p>
+            <h3 id="mod-p-name" class="text-2xl font-bold mb-1">ชื่อสินค้า</h3>
+            <p id="mod-p-price" class="text-blue-600 font-bold mb-6">ราคาเริ่มต้น ฿0</p>
             <div id="mod-list" class="space-y-6"></div>
             <div class="flex justify-between items-center sticky bottom-0 bg-white pt-6 border-t mt-8">
                 <p id="mod-total" class="text-3xl font-bold text-red-600">฿0</p>
-                <button onclick="addCartWithMods()" class="bg-blue-600 text-white px-12 py-4 rounded-[2rem] font-bold shadow-lg btn-touch">เพิ่มลงตะกร้า</button>
+                <button onclick="addCartWithMods()" class="bg-blue-600 text-white px-12 py-4 rounded-[2rem] font-bold shadow-lg">ยืนยัน</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: ADMIN (ADD/EDIT) -->
-    <div id="admin-modal" class="fixed inset-0 bg-black/60 hidden z-[70] flex items-center justify-center p-4">
+    <!-- MODAL: ADMIN (Add/Edit) -->
+    <div id="admin-modal" class="fixed inset-0 bg-black/60 hidden z-[110] flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
             <h2 class="text-2xl font-bold mb-6">ข้อมูลสินค้า</h2>
             <div class="space-y-4">
@@ -164,311 +150,4 @@
                 <input type="text" id="admin-name" placeholder="ชื่อสินค้า" class="w-full p-4 bg-gray-50 rounded-2xl outline-none border-none">
                 <div class="grid grid-cols-2 gap-2">
                     <input type="number" id="admin-price" placeholder="ราคาขาย" class="p-4 bg-gray-50 rounded-2xl border-none">
-                    <input type="number" id="admin-cost" placeholder="ต้นทุน" class="p-4 bg-gray-50 rounded-2xl border-none">
-                </div>
-                <input type="number" id="admin-stock" placeholder="สต็อก" class="w-full p-4 bg-gray-50 rounded-2xl border-none">
-                <input type="text" id="admin-cat" placeholder="หมวดหมู่" class="w-full p-4 bg-gray-50 rounded-2xl border-none">
-                <div class="bg-blue-50 p-4 rounded-2xl">
-                    <p class="text-[9px] font-bold text-blue-400 mb-2 uppercase">ตัวเลือกเสริม (ชื่อ:ราคา, ชื่อ:ราคา)</p>
-                    <input type="text" id="admin-mods" placeholder="เช่น พิเศษ:10, ไข่ดาว:10" class="w-full p-3 bg-white rounded-xl text-sm border-none">
-                </div>
-                <div class="flex gap-2">
-                    <button onclick="closeAdminModal()" class="flex-1 font-bold text-gray-400">ปิด</button>
-                    <button onclick="saveProduct()" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-bold btn-touch">บันทึก</button>
-                </div>
-                <button onclick="deleteProduct()" id="btn-del" class="w-full text-red-300 text-[10px] font-bold uppercase hidden">ลบสินค้านี้</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: CHECKOUT -->
-    <div id="pay-modal" class="fixed inset-0 bg-black/70 hidden z-[100] flex items-end">
-        <div class="bg-white w-full rounded-t-[3.5rem] p-8 pb-12 shadow-2xl anim-up">
-            <h2 id="pay-display" class="text-7xl font-bold text-blue-600 text-center mb-8">฿0</h2>
-            <div class="grid grid-cols-3 gap-3 mb-8">
-                <button onclick="setMethod('Cash')" id="m-Cash" class="btn-touch p-4 bg-blue-50 border-2 border-blue-600 rounded-3xl flex flex-col items-center">
-                    <span class="text-2xl">💵</span><span class="text-[9px] font-bold uppercase">Cash</span>
-                </button>
-                <button onclick="setMethod('Transfer')" id="m-Transfer" class="btn-touch p-4 bg-gray-50 border-2 border-transparent rounded-3xl flex flex-col items-center">
-                    <span class="text-2xl">📱</span><span class="text-[9px] font-bold uppercase">Transfer</span>
-                </button>
-                <button onclick="setMethod('ThaiPlus')" id="m-ThaiPlus" class="btn-touch p-4 bg-gray-50 border-2 border-transparent rounded-3xl flex flex-col items-center">
-                    <span class="text-2xl">💎</span><span class="text-[9px] font-bold uppercase">ThaiPlus</span>
-                </button>
-            </div>
-
-            <div id="box-Cash" class="mb-8">
-                <input type="number" id="cash-in" oninput="calcChange()" placeholder="รับเงินมา..." class="w-full p-6 bg-blue-50 rounded-[2.5rem] text-4xl text-center font-bold text-blue-600 outline-none">
-                <p class="text-center mt-4 font-bold">เงินทอน: <span id="change-txt" class="text-green-600">฿0</span></p>
-            </div>
-            <div id="box-Transfer" class="hidden flex flex-col items-center mb-8">
-                <img id="qr-img" class="w-56 h-56 border p-2 rounded-2xl mb-2">
-                <p class="text-blue-600 font-bold">กสิกรไทย: 198-1-04949-3</p>
-            </div>
-
-            <div class="flex gap-3">
-                <button onclick="closeCheckout()" class="flex-1 font-bold text-gray-400">ยกเลิก</button>
-                <button onclick="submitOrder()" class="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-bold btn-touch uppercase">บันทึกยอดขาย</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // --- Firebase Config ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAvqnQ-j9nDKuXfmDe7Jr28cJcydnKxcjM",
-            authDomain: "leungcheuluecha.firebaseapp.com",
-            databaseURL: "https://leungcheuluecha-default-rtdb.asia-southeast1.firebasedatabase.app/",
-            projectId: "leungcheuluecha",
-            storageBucket: "leungcheuluecha.firebasestorage.app",
-            messagingSenderId: "497959094385",
-            appId: "1:497959094385:web:bf9c2a804d99af0eba33d0"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-
-        let products = [], orders = [], cart = [];
-        let curCat = "ทั้งหมด", editIdx = -1, selectedP = null, chosenMods = [], payMethod = 'Cash', repRange = 'today';
-
-        // SYNC
-        db.ref('products').on('value', snap => { products = snap.val() || []; renderPOS(); renderStock(); });
-        db.ref('orders').on('value', snap => { orders = Object.entries(snap.val() || {}).map(([id, v]) => ({id, ...v})); renderKitchen(); loadReport(); });
-
-        // NAVIGATION
-        function showPage(p) {
-            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
-            document.getElementById('page-'+p).classList.remove('hidden');
-            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
-            document.getElementById('nav-'+p).classList.add('tab-active');
-            updateCartBar();
-        }
-
-        // --- POS & MODS ---
-        function renderPOS() {
-            const grid = document.getElementById('pos-grid');
-            const search = document.getElementById('search').value.toLowerCase();
-            const cats = ["ทั้งหมด", ...new Set(products.map(p => p.category))];
-            
-            document.getElementById('pos-cats').innerHTML = cats.map(c => `
-                <button onclick="setCat('${c}')" class="px-6 py-2 rounded-full font-bold text-[10px] border tracking-widest uppercase ${curCat===c?'bg-blue-600 text-white':'bg-white text-gray-400'}">${c}</button>
-            `).join('');
-
-            const filtered = products.filter(p => (curCat==="ทั้งหมด" || p.category===curCat) && p.name.toLowerCase().includes(search));
-            grid.innerHTML = filtered.map(p => {
-                const idx = products.indexOf(p);
-                return `
-                <div onclick="selectProduct(${idx})" class="bg-white p-2 rounded-[2rem] shadow-sm border border-blue-50 btn-touch card-active">
-                    <img src="${p.img || 'https://via.placeholder.com/200'}" class="w-full h-24 object-cover rounded-[1.5rem] mb-2">
-                    <div class="font-bold text-xs px-2 truncate">${p.name}</div>
-                    <div class="text-blue-600 font-bold text-sm px-2 italic">฿${p.price}</div>
-                </div>`;
-            }).join('');
-        }
-
-        function setCat(c) { curCat = c; renderPOS(); }
-
-        function selectProduct(idx) {
-            const p = products[idx];
-            selectedP = { ...p, pid: idx };
-            chosenMods = [];
-            const modsArr = p.modifiers ? p.modifiers.split(',').map(m => {
-                const [name, price] = m.split(':');
-                return { name: name.trim(), price: parseInt(price) || 0 };
-            }) : [];
-
-            if (modsArr.length > 0) {
-                document.getElementById('mod-p-name').innerText = p.name;
-                document.getElementById('mod-p-price').innerText = `฿${p.price}`;
-                document.getElementById('mod-list').innerHTML = `<div class="grid grid-cols-2 gap-2">${modsArr.map((m, i) => `
-                    <div onclick="toggleMod(this, '${m.name}', ${m.price})" class="bg-gray-50 p-4 rounded-2xl border-2 border-transparent text-center btn-touch">
-                        <div class="text-xs font-bold">${m.name}</div><div class="text-[10px] text-gray-400">+฿${m.price}</div>
-                    </div>`).join('')}</div>`;
-                updateModTotal();
-                document.getElementById('mod-modal').classList.remove('hidden');
-            } else { addToCart(p, []); }
-        }
-
-        function toggleMod(el, name, price) {
-            const idx = chosenMods.findIndex(m => m.name === name);
-            if (idx > -1) { chosenMods.splice(idx, 1); el.classList.remove('item-selected'); }
-            else { chosenMods.push({ name, price }); el.classList.add('item-selected'); }
-            updateModTotal();
-        }
-
-        function updateModTotal() {
-            const total = selectedP.price + chosenMods.reduce((s, m) => s + m.price, 0);
-            document.getElementById('mod-total').innerText = `฿${total}`;
-        }
-
-        function addCartWithMods() { addToCart(selectedP, chosenMods); document.getElementById('mod-modal').classList.add('hidden'); }
-
-        function addToCart(p, mods) {
-            const total = p.price + mods.reduce((s, m) => s + m.price, 0);
-            cart.push({ ...p, finalPrice: total, mods: mods.map(m => m.name) });
-            updateCartBar();
-        }
-
-        function updateCartBar() {
-            const bar = document.getElementById('cart-bar');
-            if(cart.length > 0 && !document.getElementById('page-sell').classList.contains('hidden')) {
-                bar.classList.remove('hidden');
-                const total = cart.reduce((s, i) => s + i.finalPrice, 0);
-                document.getElementById('cart-qty').innerText = cart.length;
-                document.getElementById('cart-total').innerText = "฿" + total.toLocaleString();
-            } else bar.classList.add('hidden');
-        }
-
-        // --- CHECKOUT ---
-        function openCheckout() {
-            const total = cart.reduce((s, i) => s + i.finalPrice, 0);
-            document.getElementById('pay-display').innerText = "฿" + total.toLocaleString();
-            setMethod('Cash');
-            document.getElementById('pay-modal').classList.remove('hidden');
-        }
-
-        function setMethod(m) {
-            payMethod = m;
-            document.querySelectorAll('#pay-modal button[id^="m-"]').forEach(b => b.classList.replace('bg-blue-50', 'bg-gray-50'));
-            document.querySelectorAll('#pay-modal button[id^="m-"]').forEach(b => b.classList.replace('border-blue-600', 'border-transparent'));
-            document.getElementById('m-'+m).classList.replace('bg-gray-50', 'bg-blue-50');
-            document.getElementById('m-'+m).classList.replace('border-transparent', 'border-blue-600');
-            
-            ['Cash', 'Transfer'].forEach(x => document.getElementById('box-'+x).classList.add('hidden'));
-            if(document.getElementById('box-'+m)) document.getElementById('box-'+m).classList.remove('hidden');
-            if(m === 'Transfer') {
-                const total = cart.reduce((s, i) => s + i.finalPrice, 0);
-                document.getElementById('qr-img').src = `https://promptpay.io/1981049493/${total}.png`;
-            }
-        }
-
-        function calcChange() {
-            const total = cart.reduce((s, i) => s + i.finalPrice, 0);
-            const input = parseFloat(document.getElementById('cash-in').value) || 0;
-            document.getElementById('change-txt').innerText = `฿${Math.max(0, input - total).toLocaleString()}`;
-        }
-
-        function submitOrder() {
-            const total = cart.reduce((s, i) => s + i.finalPrice, 0);
-            const cost = cart.reduce((s, i) => s + (parseFloat(i.cost) || 0), 0);
-            const data = { items: cart, total, cost, method: payMethod, ts: Date.now(), date: new Date().toISOString().split('T')[0] };
-            db.ref('orders').push(data).then(() => {
-                cart.forEach(i => db.ref(`products/${i.pid}/stock`).transaction(s => Math.max(0, (s || 0) - 1)));
-                alert("ขายสำเร็จ!"); cart = []; closeCheckout(); updateCartBar();
-            });
-        }
-        function closeCheckout() { document.getElementById('pay-modal').classList.add('hidden'); }
-
-        // --- KITCHEN ---
-        function renderKitchen() {
-            const pending = orders.filter(o => o.status !== 'done');
-            document.getElementById('k-badge').innerText = pending.length;
-            document.getElementById('k-badge').classList.toggle('hidden', pending.length === 0);
-            document.getElementById('kitchen-list').innerHTML = pending.reverse().map(o => `
-                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50">
-                    <div class="flex justify-between mb-4"><span class="text-[10px] font-bold text-blue-400 uppercase">#${o.id.slice(-4)}</span>
-                    <span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[9px] font-bold uppercase">${o.method}</span></div>
-                    <div class="space-y-2 mb-6">${o.items.map(i => `<div class="font-bold text-lg">● ${i.name} <span class="text-red-400 text-xs">${i.mods ? '('+i.mods.join(',')+')' : ''}</span></div>`).join('')}</div>
-                    <button onclick="doneOrder('${o.id}')" class="w-full bg-[#E3F2FD] text-blue-600 py-4 rounded-2xl font-bold btn-touch">ทำเสร็จแล้ว</button>
-                </div>`).join('') || '<p class="text-center py-20 text-gray-300">ไม่มีออเดอร์</p>';
-        }
-        function doneOrder(id) { db.ref(`orders/${id}`).update({ status: 'done' }); }
-
-        // --- STOCK ---
-        function renderStock() {
-            const list = document.getElementById('admin-list');
-            document.getElementById('stk-count').innerText = products.length;
-            document.getElementById('stk-value').innerText = `฿${products.reduce((s,p)=>s+(p.cost*p.stock),0).toLocaleString()}`;
-            list.innerHTML = products.map((p, i) => `
-                <div onclick="editProduct(${i})" class="bg-white p-4 rounded-3xl flex justify-between items-center border border-blue-50 btn-touch">
-                    <div class="flex items-center gap-3"><img src="${p.img || ''}" class="w-12 h-12 rounded-2xl object-cover bg-gray-100">
-                    <div><div class="font-bold text-sm">${p.name}</div><div class="text-[9px] text-blue-400 font-bold uppercase">สต็อก: ${p.stock} | ทุน: ฿${p.cost}</div></div></div>
-                    <span class="text-blue-600 text-xs font-bold">แก้ไข ></span>
-                </div>`).join('');
-        }
-
-        function openAdminModal() { editIdx = -1; resetAdmin(); document.getElementById('btn-del').classList.add('hidden'); document.getElementById('admin-modal').classList.remove('hidden'); }
-        function editProduct(i) {
-            editIdx = i; const p = products[i];
-            document.getElementById('admin-name').value = p.name;
-            document.getElementById('admin-price').value = p.price;
-            document.getElementById('admin-cost').value = p.cost;
-            document.getElementById('admin-stock').value = p.stock;
-            document.getElementById('admin-cat').value = p.category;
-            document.getElementById('admin-mods').value = p.modifiers || "";
-            document.getElementById('admin-preview').src = p.img || "";
-            document.getElementById('btn-del').classList.remove('hidden');
-            document.getElementById('admin-modal').classList.remove('hidden');
-        }
-        
-        function previewImg(e) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const scale = 300 / img.width;
-                    canvas.width = 300; canvas.height = img.height * scale;
-                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                    document.getElementById('admin-preview').src = canvas.toDataURL('image/jpeg', 0.7);
-                };
-                img.src = ev.target.result;
-            };
-            reader.readAsDataURL(e.target.files[0]);
-        }
-
-        function saveProduct() {
-            const data = {
-                name: document.getElementById('admin-name').value,
-                price: parseFloat(document.getElementById('admin-price').value) || 0,
-                cost: parseFloat(document.getElementById('admin-cost').value) || 0,
-                stock: parseInt(document.getElementById('admin-stock').value) || 0,
-                category: document.getElementById('admin-cat').value || "ทั่วไป",
-                img: document.getElementById('admin-preview').src,
-                modifiers: document.getElementById('admin-mods').value
-            };
-            if(editIdx === -1) products.push(data); else products[editIdx] = data;
-            db.ref('products').set(products).then(() => { closeAdminModal(); alert("บันทึกสำเร็จ"); });
-        }
-        function deleteProduct() { if(confirm("ลบ?")) { products.splice(editIdx, 1); db.ref('products').set(products); closeAdminModal(); } }
-        function resetAdmin() { ["admin-name","admin-price","admin-cost","admin-stock","admin-cat","admin-mods"].forEach(id => document.getElementById(id).value = ""); document.getElementById('admin-preview').src = ""; }
-        function closeAdminModal() { document.getElementById('admin-modal').classList.add('hidden'); }
-
-        // --- REPORT ---
-        function setReportRange(r) { repRange = r; loadReport(); }
-        function loadReport() {
-            const now = new Date();
-            let start;
-            if(repRange === 'today') start = new Date(now.setHours(0,0,0,0));
-            else if(repRange === '7days') start = new Date(now.setDate(now.getDate() - 7));
-            else if(repRange === '30days') start = new Date(now.setDate(now.getDate() - 30));
-
-            const filtered = orders.filter(o => new Date(o.ts) >= start);
-            const total = filtered.reduce((s,o)=>s+o.total,0);
-            const profit = total - filtered.reduce((s,o)=>s+(o.cost||0),0);
-            
-            document.getElementById('rep-sales').innerText = `฿${total.toLocaleString()}`;
-            document.getElementById('rep-profit').innerText = `฿${profit.toLocaleString()}`;
-            document.getElementById('rep-tax').innerText = `฿${(total * 0.07).toLocaleString()}`;
-            
-            const cash = filtered.filter(o=>o.method==='Cash').reduce((s,o)=>s+o.total,0);
-            const trans = filtered.filter(o=>o.method==='Transfer').reduce((s,o)=>s+o.total,0);
-            const tp = filtered.filter(o=>o.method==='ThaiPlus').reduce((s,o)=>s+o.total,0);
-            
-            renderChart([cash, trans, tp]);
-        }
-
-        let chart;
-        function renderChart(data) {
-            const ctx = document.getElementById('salesChart').getContext('2d');
-            if(chart) chart.destroy();
-            chart = new Chart(ctx, {
-                type: 'doughnut',
-                data: { labels: ['เงินสด', 'โอน', 'ไทยพลัส'], datasets: [{ data, backgroundColor: ['#10b981', '#3b82f6', '#8b5cf6'], borderWidth: 0 }] },
-                options: { cutout: '80%', plugins: { legend: { position: 'bottom' } } }
-            });
-        }
-
-        showPage('sell');
-    </script>
-</body>
-</html>
+                    <input type="number" id="a
