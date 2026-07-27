@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>เลื่องชื่อลือชา POS Cloud</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; background: #f3f4f6; }
+        .nav-active { color: #ef4444; border-bottom: 3px solid #ef4444; font-weight: bold; }
+        .btn-tap:active { transform: scale(0.98); }
+    </style>
+</head>
+<body class="pb-24 text-gray-800">
+
+    <!-- Header -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="p-4 flex justify-between items-center border-b">
+            <h1 class="text-xl font-bold text-red-600 italic">เลื่องชื่อลือชา <span class="text-[10px] text-blue-500 font-normal not-italic">CLOUD</span></h1>
+            <div id="db-status" class="text-[10px] px-2 py-1 rounded-full font-bold bg-gray-100 text-gray-400">กำลังเชื่อมต่อ...</div>
+        </div>
+        <div class="flex justify-around text-gray-500 text-xs">
+            <button onclick="showPage('pos')" id="nav-pos" class="nav-active px-4 py-3 uppercase">Sell / ขาย</button>
+            <button onclick="showPage('kitchen')" id="nav-kitchen" class="px-4 py-3 relative uppercase">Kitchen / ครัว <span id="k-badge" class="absolute top-2 right-1 bg-red-500 text-white text-[10px] px-1.5 rounded-full hidden">0</span></button>
+            <button onclick="showPage('admin')" id="nav-admin" class="px-4 py-3 uppercase">Admin / คลัง</button>
+        </div>
+    </nav>
+
+    <!-- Page: POS -->
+    <main id="page-pos" class="p-3 grid grid-cols-2 gap-3"></main>
+
+    <!-- Page: Kitchen -->
+    <main id="page-kitchen" class="p-4 hidden space-y-4"></main>
+
+    <!-- Page: Admin -->
+    <main id="page-admin" class="p-4 hidden space-y-6">
+        <div class="bg-red-50 p-5 rounded-3xl border-2 border-red-200 text-center">
+            <h2 class="text-red-600 font-bold mb-2">⚙️ ตั้งค่าระบบ</h2>
+            <button onclick="seedData()" class="w-full bg-red-600 text-white py-4 rounded-2xl font-bold btn-tap shadow-lg">✨ ติดตั้งสินค้าเริ่มต้น</button>
+        </div>
+        <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+            <h2 class="font-bold text-gray-700 mb-3">📱 เบอร์ PromptPay</h2>
+            <input type="text" id="pp-input" placeholder="08x-xxx-xxxx" class="w-full p-4 bg-gray-50 border rounded-2xl mb-3 outline-none focus:border-blue-500">
+            <button onclick="saveSettings()" class="w-full bg-blue-600 text-white py-3 rounded-2xl font-bold btn-tap">บันทึกเบอร์</button>
+        </div>
+        <div id="stock-list" class="space-y-3 pt-2"></div>
+    </main>
+
+    <!-- Cart Bar -->
+    <div id="cart-bar" class="fixed bottom-0 left-0 right-0 bg-white p-4 shadow-2xl flex justify-between items-center hidden z-40 border-t">
+        <div>
+            <div id="cart-count" class="text-[10px] text-gray-400 font-bold">0 ITEMS</div>
+            <div id="cart-total" class="text-2xl font-bold text-red-600">฿0</div>
+        </div>
+        <button onclick="openPayment()" class="bg-red-600 text-white px-10 py-4 rounded-2xl font-bold btn-tap shadow-lg">ชำระเงิน</button>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="pay-modal" class="fixed inset-0 bg-black/95 hidden z-[100] flex flex-col items-center justify-center p-6 text-white text-center">
+        <div id="pay-amount" class="text-7xl font-bold text-yellow-400 mb-10 tracking-tighter">฿0</div>
+        <div id="qr-box" class="bg-white p-4 rounded-3xl mb-10 hidden"><img id="qr-img" class="w-60 h-60 mx-auto"></div>
+        <div class="grid grid-cols-2 gap-4 w-full max-w-sm">
+            <button onclick="submitOrder('Cash')" class="bg-white/10 border border-white/20 py-6 rounded-3xl font-bold btn-tap">💵 เงินสด</button>
+            <button onclick="generateQR()" class="bg-blue-600 py-6 rounded-3xl font-bold btn-tap">📱 โอนเงิน</button>
+        </div>
+        <button onclick="closePayment()" class="mt-12 text-gray-500 font-bold uppercase text-[10px] tracking-widest">Close</button>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAvqnQ-j9nDKuXfmDe7Jr28cJcydnKxcjM",
+            authDomain: "leungcheuluecha.firebaseapp.com",
+            databaseURL: "https://leungcheuluecha-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "leungcheuluecha",
+            storageBucket: "leungcheuluecha.firebasestorage.app",
+            messagingSenderId: "497959094385",
+            appId: "1:497959094385:web:bf9c2a804d99af0eba33d0",
+            measurementId: "G-88L5E7FP91"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let products = [], orders = [], settings = { promptpay: "" }, cart = [];
+
+        db.ref('.info/connected').on('value', s => {
+            const st = document.getElementById('db-status');
+            st.innerText = s.val() ? "● Online" : "● Connecting...";
+            st.className = s.val() ? "text-[10px] bg-green-100 text-green-600 px-2 py-1 rounded-full font-bold" : "text-[10px] bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full font-bold";
+        });
+
+        db.ref('products').on('value', snap => { products = snap.val() || []; renderPOS(); renderAdmin(); });
+        db.ref('orders').on('value', snap => { 
+            const data = snap.val() || {}; 
+            orders = Object.keys(data).map(k => ({ key: k, ...data[k] })); 
+            renderKitchen(); 
+        });
+        db.ref('settings').on('value', snap => { 
+            settings = snap.val() || { promptpay: "" }; 
+            document.getElementById('pp-input').value = settings.promptpay; 
+        });
+
+        function showPage(p) {
+            document.querySelectorAll('main').forEach(m => m.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('nav-active'));
+            document.getElementById('page-'+p).classList.remove('hidden');
+            document.getElementById('nav-'+p).classList.add('nav-active');
+            updateCart();
+        }
+
+        function renderPOS() {
+            const grid = document.getElementById('page-pos');
+            grid.innerHTML = products.map((p, i) => `
+                <div onclick="addToCart(${i})" class="bg-white p-2 rounded-3xl shadow-sm border border-gray-100 btn-tap ${p.stock <= 0 ? 'opacity-30 pointer-events-none' : ''}">
+                    <img src="${p.img}" class="w-full h-28 object-cover rounded-2xl mb-2 pointer-events-none">
+                    <div class="font-bold text-sm px-1 truncate">${p.name}</div>
+                    <div class="flex justify-between items-center px-1 mt-1">
+                        <span class="text-red-600 font-bold">฿${p.price}</span>
+                        <span class="text-[9px] text-gray-400">สต็อก ${p.stock}</span>
+                    </div>
+                </div>`).join('') || '<div class="col-span-2 text-center py-20 text-gray-400">ไม่มีสินค้า</div>';
+        }
+
+        function addToCart(idx) { cart.push({ ...products[idx], pid: idx }); updateCart(); }
+        function updateCart() {
+            const bar = document.getElementById('cart-bar');
+            if(cart.length > 0 && !document.getElementById('page-pos').classList.contains('hidden')) {
+                bar.classList.remove('hidden');
+                const total = cart.reduce((s, i) => s + i.price, 0);
+                document.getElementById('cart-count').innerText = cart.length + " ITEMS";
+                document.getElementById('cart-total').innerText = "฿" + total.toLocaleString();
+            } else bar.classList.add('hidden');
+        }
+
+        function openPayment() {
+            const total = cart.reduce((s, i) => s + i.price, 0);
+            document.getElementById('pay-amount').innerText = "฿" + total.toLocaleString();
+            document.getElementById('pay-modal').classList.remove('hidden');
+        }
+
+        function generateQR() {
+            if(!settings.promptpay) return alert("ตั้งค่าเบอร์ PromptPay ก่อนครับ");
+            const total = cart.reduce((s, i) => s + i.price, 0);
+            document.getElementById('qr-img').src = "https://promptpay.io/" + settings.promptpay + "/" + total + ".png";
+            document.getElementById('qr-box').classList.remove('hidden');
+        }
+
+        function submitOrder(method) {
+            const total = cart.reduce((s, i) => s + i.price, 0);
+            db.ref('orders').push({ items: cart, total, method, status: 'pending', timestamp: Date.now() });
+            cart.forEach(item => { db.ref('products/'+item.pid+'/stock').transaction(s => Math.max(0, (s || 0) - 1)); });
+            alert("สั่งอาหารแล้ว!"); cart = []; updateCart(); closePayment();
+        }
+
+        function renderKitchen() {
+            const container = document.getElementById('page-kitchen');
+            const pending = orders.filter(o => o.status === 'pending');
+            document.getElementById('k-badge').innerText = pending.length;
+            document.getElementById('k-badge').classList.toggle('hidden', pending.length === 0);
+            container.innerHTML = pending.reverse().map(o => `
+                <div class="bg-white p-5 rounded-3xl shadow-sm border-l-8 border-red-500">
+                    <div class="flex justify-between mb-3 text-[10px] font-bold text-gray-400 uppercase">
+                        <span>Order #${o.key.slice(-4)}</span>
+                        <span class="text-red-500">${o.method}</span>
+                    </div>
+                    <div class="space-y-2 mb-6">${o.items.map(i => `<div class="font-bold text-lg">● ${i.name}</div>`).join('')}</div>
+                    <button onclick="finishOrder('${o.key}')" class="w-full bg-green-600 text-white py-4 rounded-2xl font-bold btn-tap">เสร็จแล้ว</button>
+                </div>`).join('') || '<div class="text-center py-20 text-gray-400 italic">ไม่มีรายการอาหาร</div>';
+        }
+
+        function finishOrder(key) { db.ref('orders/'+key).update({ status: 'done' }); }
+        function renderAdmin() {
+            const list = document.getElementById('stock-list');
+            list.innerHTML = products.map((p, i) => `
+                <div class="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-gray-50">
+                    <div><div class="font-bold text-gray-800">${p.name}</div><div class="text-xs text-red-500 font-bold italic">Stock: ${p.stock}</div></div>
+                    <div class="flex gap-2"><button onclick="updateStock(${i}, 10)" class="bg-gray-50 px-4 py-2 rounded-xl border font-bold">+10</button>
+                    <button onclick="updateStock(${i}, -10)" class="bg-gray-50 px-4 py-2 rounded-xl border font-bold">-10</button></div>
+                </div>`).join('');
+        }
+
+        function updateStock(idx, amt) { db.ref('products/'+idx+'/stock').transaction(s => Math.max(0, (s || 0) + amt)); }
+        function saveSettings() {
+            const pp = document.getElementById('pp-input').value;
+            db.ref('settings').set({ promptpay: pp });
+            alert("บันทึกแล้ว!");
+        }
+
+        function closePayment() { document.getElementById('pay-modal').classList.add('hidden'); document.getElementById('qr-box').classList.add('hidden'); }
+        function seedData() {
+            if(!confirm("ยืนยันติดตั้งสินค้า?")) return;
+            const initial = [
+                { name: "ข้าวมันไก่ต้ม", price: 50, stock: 50, img: "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=300" },
+                { name: "ข้าวมันไก่ทอด", price: 55, stock: 50, img: "https://images.unsplash.com/photo-1562967914-608f82629710?w=300" },
+                { name: "น้ำเก๊กฮวย", price: 15, stock: 100, img: "https://images.unsplash.com/photo-1543257580-7269da773bf5?w=300" }
+            ];
+            db.ref('products').set(initial);
+        }
+        showPage('pos');
+    </script>
+</body>
+</html>
