@@ -10,13 +10,21 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root { --p-teal: #1A5F7A; --s-teal: #159895; --bg-cream: #FDFBF7; }
+        :root { --p-teal: #1A5F7A; --s-teal: #159895; }
         body { font-family: 'Kanit', sans-serif; background-color: #f1f5f9; touch-action: manipulation; }
         .btn-touch { transition: all 0.1s; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .btn-touch:active { transform: scale(0.95); opacity: 0.8; }
         .tab-active { background-color: var(--p-teal) !important; color: white !important; }
         .opt-selected { background-color: var(--s-teal) !important; color: white !important; border-color: var(--s-teal) !important; }
         .hide-scroll::-webkit-scrollbar { display: none; }
+        
+        /* Animation สำหรับตะกร้าเวลาเพิ่มของ */
+        @keyframes cartBounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .cart-added { animation: cartBounce 0.4s ease-in-out; }
+        
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .anim-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
     </style>
@@ -29,135 +37,128 @@
             <button class="text-2xl">☰</button>
             <h1 class="font-bold text-lg">เลื่องชื่อลือชา (สาขา เดอะมอลล์)</h1>
         </div>
-        <div class="flex items-center gap-4 text-xl">
-            <span>🔍</span><span>ⓘ</span>
-        </div>
+        <div id="db-status" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-green-500/20 text-green-300 border border-green-500/30">Online</div>
     </header>
 
-    <!-- SUB HEADER / STATS -->
+    <!-- SUB HEADER / ยอดขายด่วน -->
     <div class="bg-[#2D4356] text-white px-6 py-2 flex justify-between items-center text-sm">
-        <div class="flex items-center gap-2">ยอดวันนี้ <span id="rep-total-top" class="text-lg font-bold">0</span> บาท · 0 บิล</div>
-        <div class="bg-green-500 w-2 h-2 rounded-full"></div>
+        <div class="flex items-center gap-2 italic">ยอดวันนี้ <span id="rep-total-top" class="text-lg font-bold text-teal-300">0</span> บาท</div>
+        <div class="flex gap-4 opacity-70">
+            <span>🔍 ค้นหา</span>
+            <span>ⓘ ข้อมูล</span>
+        </div>
     </div>
 
     <div id="main-content" class="flex flex-col lg:flex-row h-[calc(100vh-140px)]">
         
-        <!-- LEFT: PRODUCT AREA -->
+        <!-- ฝั่งซ้าย: เลือกสินค้า -->
         <div class="flex-1 p-4 overflow-y-auto hide-scroll border-r">
-            <!-- หมวดหมู่ -->
             <div class="mb-6">
-                <div class="flex items-center gap-2 mb-3 font-bold text-gray-600"><span class="text-xl">㗊</span> หมวดหมู่</div>
+                <div class="flex items-center gap-2 mb-3 font-bold text-gray-600 uppercase text-xs tracking-widest">● หมวดหมู่</div>
                 <div id="pos-cats" class="flex gap-2 overflow-x-auto pb-2 hide-scroll"></div>
             </div>
 
-            <!-- รายการสินค้า -->
-            <div class="flex items-center gap-2 mb-4 font-bold text-gray-600">📦 รายการสินค้า</div>
-            <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                <!-- สินค้าจะเด้งที่นี่ -->
+            <div class="flex items-center gap-2 mb-4 font-bold text-gray-600 uppercase text-xs tracking-widest">● รายการสินค้า</div>
+            <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <!-- สินค้า -->
             </div>
         </div>
 
-        <!-- RIGHT: CART AREA (Desktop) -->
-        <div class="w-full lg:w-80 bg-white p-4 flex flex-col shadow-inner">
-            <h2 class="font-bold text-gray-500 mb-4">ตะกร้าสินค้า</h2>
-            <div id="cart-list" class="flex-1 overflow-y-auto space-y-4 text-sm text-gray-400">
-                <div class="flex flex-col items-center justify-center py-20">
-                    <div class="bg-gray-100 p-4 rounded-full mb-3">🛍️</div>
-                    <p>ยังไม่มีสินค้าในตะกร้า</p>
+        <!-- ฝั่งขวา: ตะกร้าสินค้า -->
+        <div class="w-full lg:w-96 bg-white p-6 flex flex-col shadow-2xl z-10">
+            <h2 class="font-bold text-teal-900 mb-6 flex justify-between items-center">
+                ตะกร้าสินค้า 
+                <button onclick="clearCart()" class="text-[10px] text-gray-400 font-normal underline uppercase">ล้างทั้งหมด</button>
+            </h2>
+            <div id="cart-list" class="flex-1 overflow-y-auto space-y-3 mb-6 hide-scroll">
+                <div class="flex flex-col items-center justify-center py-20 opacity-20">
+                    <div class="text-5xl mb-2">🛍️</div>
+                    <p class="text-xs font-bold uppercase tracking-widest">ยังไม่มีรายการ</p>
                 </div>
             </div>
-            <div class="border-t pt-4">
-                <div class="flex justify-between items-center mb-4">
-                    <span class="font-bold text-gray-600 uppercase text-xs">ยอดรวมทั้งหมด</span>
-                    <span id="cart-total" class="text-2xl font-bold text-red-600">0 บาท</span>
+            
+            <div class="border-t pt-6">
+                <div class="flex justify-between items-center mb-6">
+                    <span class="font-bold text-gray-400 uppercase text-[10px] tracking-widest">ยอดรวมสุทธิ</span>
+                    <span id="cart-total" class="text-3xl font-bold text-red-600 italic">0 บาท</span>
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <button onclick="clearCart()" class="bg-red-100 text-red-600 py-4 rounded-xl font-bold btn-touch">พักบิล</button>
-                    <button onclick="openPayment()" class="bg-teal-600 text-white py-4 rounded-xl font-bold shadow-lg btn-touch">ชำระเงิน</button>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="alert('พักบิลเรียบร้อย')" class="bg-gray-100 text-gray-500 py-4 rounded-2xl font-bold btn-touch uppercase text-xs">พักบิล</button>
+                    <button onclick="openPayment()" id="btn-pay" class="bg-teal-600 text-white py-4 rounded-2xl font-bold shadow-lg btn-touch uppercase text-xs tracking-widest">ชำระเงิน</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: PRODUCT OPTIONS (เหมือนในรูปเป๊ะ) -->
-    <div id="mod-modal" class="fixed inset-0 bg-black/60 hidden z-[100] flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[90vh]">
-            <!-- Left Info -->
-            <div class="p-8 flex-1 border-r">
-                <div class="flex justify-between items-start mb-6">
-                    <h2 class="text-2xl font-bold">ยืนยันจำนวนสินค้า</h2>
-                    <button onclick="closeMod()" class="text-2xl text-gray-300">✕</button>
+    <!-- MODAL: ยืนยันสินค้า (เหมือนในรูป) -->
+    <div id="mod-modal" class="fixed inset-0 bg-black/70 hidden z-[100] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-4xl rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[90vh] anim-up">
+            
+            <!-- ส่วนซ้าย: ข้อมูลพื้นฐาน -->
+            <div class="p-10 flex-1 border-r bg-white">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800">ยืนยันจำนวนสินค้า</h2>
+                    <button onclick="closeMod()" class="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-400 rounded-full btn-touch">✕</button>
                 </div>
                 
-                <div class="flex gap-4 mb-8 bg-gray-50 p-4 rounded-2xl">
-                    <img id="mod-img" class="w-24 h-24 rounded-2xl object-cover border-2 border-white shadow-sm">
+                <div class="flex gap-6 mb-10 items-center">
+                    <img id="mod-img" class="w-32 h-32 rounded-3xl object-cover shadow-md border-4 border-white">
                     <div>
-                        <h3 id="mod-name" class="text-xl font-bold text-teal-800">ชื่อสินค้า</h3>
-                        <p id="mod-price" class="font-bold text-red-600">ราคา 0 บาท</p>
-                        <p id="mod-stock" class="text-xs text-gray-400 mt-1 italic">คงเหลือ 0 ชิ้น</p>
+                        <h3 id="mod-name" class="text-3xl font-bold text-teal-900 mb-1">ชื่อสินค้า</h3>
+                        <p id="mod-price" class="text-xl font-bold text-red-600">฿0</p>
+                        <p id="mod-stock" class="text-xs text-gray-400 mt-2 font-bold italic">คงเหลือ 0 ชิ้น</p>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-6 items-center">
+                <div class="space-y-8">
                     <div>
-                        <label class="block text-sm font-bold text-gray-400 mb-2 uppercase">จำนวน</label>
-                        <div class="flex items-center gap-4">
-                            <button onclick="changeQty(-1)" class="w-10 h-10 bg-red-100 text-red-600 rounded-xl font-bold btn-touch">-</button>
-                            <input type="number" id="mod-qty" value="1" class="w-12 text-center text-xl font-bold outline-none bg-transparent">
-                            <button onclick="changeQty(1)" class="w-10 h-10 bg-teal-100 text-teal-600 rounded-xl font-bold btn-touch">+</button>
+                        <label class="block text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest">ปรับจำนวน</label>
+                        <div class="flex items-center gap-6">
+                            <button onclick="changeQty(-1)" class="w-14 h-14 bg-red-50 text-red-600 rounded-2xl font-bold text-2xl btn-touch shadow-sm">-</button>
+                            <input type="number" id="mod-qty" value="1" class="w-16 text-center text-3xl font-bold outline-none bg-transparent" readonly>
+                            <button onclick="changeQty(1)" class="w-14 h-14 bg-teal-50 text-teal-600 rounded-2xl font-bold text-2xl btn-touch shadow-sm">+</button>
                         </div>
                     </div>
-                    <div class="text-right">
-                        <p class="text-sm font-bold text-gray-400 uppercase">ราคารวม</p>
-                        <p id="mod-total-display" class="text-3xl font-bold text-red-600">35 บาท</p>
+                    <div class="pt-6 border-t border-dashed">
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">ราคารวมรายการนี้</p>
+                        <p id="mod-total-display" class="text-5xl font-bold text-red-600 tracking-tighter">0 บาท</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Options -->
-            <div class="p-8 flex-1 bg-gray-50 overflow-y-auto">
-                <h3 class="font-bold text-teal-600 mb-4 flex items-center gap-2">ตัวเลือกสินค้า</h3>
+            <!-- ส่วนขวา: เลือกตัวเลือกเพิ่มเติม -->
+            <div class="p-10 flex-1 bg-gray-50/80 overflow-y-auto">
+                <h3 class="font-bold text-teal-700 mb-6 flex items-center gap-2 text-sm uppercase tracking-widest">
+                    <span>✨</span> ตัวเลือกสินค้า
+                </h3>
                 
-                <!-- กลุ่ม 1: ไซส์ (บังคับเลือก 1) -->
-                <div class="mb-8">
-                    <div class="flex items-center gap-2 mb-3">
-                        <span class="font-bold">ไซส์</span>
-                        <span class="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full uppercase">จำเป็น</span>
+                <!-- กลุ่ม 1: ไซส์ -->
+                <div class="mb-10">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="font-bold text-gray-700">เลือกไซส์</span>
+                        <span class="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold uppercase">จำเป็น</span>
                     </div>
-                    <div id="size-options" class="grid grid-cols-3 gap-2"></div>
+                    <div id="size-options" class="grid grid-cols-3 gap-3"></div>
                 </div>
 
-                <!-- กลุ่ม 2: ท็อปปิ้ง (เลือกหลายอย่าง) -->
-                <div>
-                    <div class="flex items-center gap-2 mb-3">
-                        <span class="font-bold">ท็อปปิ้ง</span>
-                        <span class="text-gray-400 text-[10px] uppercase">ไม่บังคับ · เลือกได้หลายอย่าง</span>
+                <!-- กลุ่ม 2: ท็อปปิ้ง -->
+                <div class="mb-10">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="font-bold text-gray-700">เพิ่มท็อปปิ้ง</span>
+                        <span class="text-gray-400 text-[9px] font-bold uppercase">เลือกได้มากกว่า 1</span>
                     </div>
-                    <div id="topping-options" class="grid grid-cols-2 gap-2"></div>
+                    <div id="topping-options" class="grid grid-cols-2 gap-3"></div>
                 </div>
 
-                <!-- ปุ่มยืนยัน -->
-                <button onclick="confirmAddToCart()" class="w-full mt-10 bg-teal-600 text-white py-5 rounded-2xl font-bold shadow-xl btn-touch flex items-center justify-center gap-3">
-                    🛒 เพิ่มลงตะกร้า
+                <button onclick="confirmAddToCart()" class="w-full bg-teal-600 text-white py-6 rounded-[2rem] font-bold shadow-2xl btn-touch flex items-center justify-center gap-3 text-lg">
+                    🛒 เพิ่มลงตะกร้าทันที
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- TAB BAR (Bottom) -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-3 z-50">
-        <button onclick="showPage('sell')" class="flex flex-col items-center gap-1 text-teal-600 font-bold">
-            <span class="text-xl">🛒</span><span class="text-[10px] uppercase">ขายสินค้า</span>
-        </button>
-        <button onclick="showPage('report')" class="flex flex-col items-center gap-1 text-gray-300">
-            <span class="text-xl">📊</span><span class="text-[10px] uppercase">รายงาน</span>
-        </button>
-        <button onclick="showPage('stock')" class="flex flex-col items-center gap-1 text-gray-300">
-            <span class="text-xl">📦</span><span class="text-[10px] uppercase">คลัง</span>
-        </button>
-    </nav>
-
     <script>
+        // --- 1. การเชื่อมต่อฐานข้อมูล ---
         const config = {
             apiKey: "AIzaSyAvqnQ-j9nDKuXfmDe7Jr28cJcydnKxcjM",
             authDomain: "leungcheuluecha.firebaseapp.com",
@@ -170,58 +171,61 @@
         let products = [], cart = [], curCat = "ทั้งหมด";
         let selP = null, selSize = null, selToppings = [], selQty = 1;
 
-        // SYNC
+        // ดึงข้อมูล Real-time
         db.ref('products').on('value', snap => {
             products = snap.val() || [];
             renderPOS();
         });
 
+        // --- 2. ฟังก์ชันหน้าขาย (POS) ---
         function renderPOS() {
             const grid = document.getElementById('pos-grid');
             const cats = ["ทั้งหมด", ...new Set(products.map(p => p.category || "ทั่วไป"))];
-            document.getElementById('pos-cats').innerHTML = cats.map(c => `<button onclick="setCat('${c}')" class="px-5 py-2 rounded-full font-bold text-xs border whitespace-nowrap uppercase btn-touch ${curCat===c?'tab-active':'bg-white text-gray-400'}">${c}</button>`).join('');
+            document.getElementById('pos-cats').innerHTML = cats.map(c => `
+                <button onclick="setCat('${c}')" class="px-6 py-2.5 rounded-full font-bold text-[10px] border whitespace-nowrap uppercase btn-touch shadow-sm transition-all ${curCat===c?'tab-active':'bg-white text-gray-400'}">${c}</button>
+            `).join('');
             
             const filtered = products.filter(p => (curCat==="ทั้งหมด" || (p.category||"ทั่วไป")===curCat));
             grid.innerHTML = filtered.map(p => {
                 const idx = products.indexOf(p);
                 return `
-                <div onclick="openMod(${idx})" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden btn-touch card-active">
+                <div onclick="openMod(${idx})" class="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden btn-touch card-active">
                     <div class="relative">
                         <img src="${p.img || 'https://via.placeholder.com/200'}" class="w-full h-32 object-cover">
-                        <span class="absolute top-2 left-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">${p.price}.-</span>
+                        <span class="absolute top-3 left-3 bg-red-600 text-white text-[11px] px-2.5 py-1 rounded-full font-bold shadow-md">${p.price}.-</span>
                     </div>
-                    <div class="p-3 text-center bg-[#1A5F7A] text-white font-bold text-xs">${p.name}</div>
+                    <div class="p-3 text-center bg-[#1A5F7A] text-white font-bold text-[11px] uppercase tracking-tighter">${p.name}</div>
                 </div>`;
             }).join('');
         }
 
         function setCat(c) { curCat = c; renderPOS(); }
 
-        // --- MODIFIER LOGIC ---
+        // --- 3. ระบบตัวเลือก (MODIFIERS) ---
         function openMod(idx) {
             selP = { ...products[idx], pid: idx };
             selQty = 1; selSize = null; selToppings = [];
             
             document.getElementById('mod-name').innerText = selP.name;
-            document.getElementById('mod-price').innerText = `ราคา ${selP.price} บาท`;
+            document.getElementById('mod-price').innerText = `฿${selP.price}`;
             document.getElementById('mod-img').src = selP.img || '';
             document.getElementById('mod-stock').innerText = `คงเหลือ ${selP.stock || 0} ชิ้น`;
             document.getElementById('mod-qty').value = selQty;
 
-            // Render Size (S, M, L)
+            // Render ไซส์
             const sizes = [{n:'S', p:0}, {n:'M', p:5}, {n:'L', p:10}];
             document.getElementById('size-options').innerHTML = sizes.map(s => `
-                <div onclick="setSize('${s.n}', ${s.p})" id="sz-${s.n}" class="border-2 rounded-2xl p-4 text-center btn-touch bg-white">
-                    <p class="font-bold">${s.n}</p>
-                    <p class="text-[9px] text-gray-400">+${s.p}</p>
+                <div onclick="setSize('${s.n}', ${s.p})" id="sz-${s.n}" class="bg-white border-2 border-gray-100 rounded-2xl p-4 text-center btn-touch shadow-sm">
+                    <p class="font-bold text-sm">${s.n}</p>
+                    <p class="text-[9px] text-gray-400 font-bold">+฿${s.p}</p>
                 </div>`).join('');
 
-            // Render Toppings
-            const toppings = [{n:'วิปครีม', p:20}, {n:'ครีมชีส', p:20}, {n:'ชีสขูด', p:20}, {n:'ช็อค+ชีสขูด', p:20}, {n:'ดับเบิ้ลช็อค+ชีส', p:40}];
+            // Render ท็อปปิ้ง
+            const toppings = [{n:'วิปครีม', p:20}, {n:'ครีมชีส', p:20}, {n:'ชีสขูด', p:20}, {n:'ช็อค+ชีส', p:25}, {n:'ดับเบิ้ลชีส', p:40}];
             document.getElementById('topping-options').innerHTML = toppings.map((t, i) => `
-                <div onclick="toggleTopping(${i}, '${t.n}', ${t.p})" id="top-${i}" class="border-2 rounded-2xl p-4 text-center btn-touch bg-white">
-                    <p class="text-[10px] font-bold">${t.n}</p>
-                    <p class="text-[9px] text-red-500 font-bold">+${t.p}</p>
+                <div onclick="toggleTopping(${i}, '${t.n}', ${t.p})" id="top-${i}" class="bg-white border-2 border-gray-100 rounded-2xl p-4 text-center btn-touch shadow-sm">
+                    <p class="text-[11px] font-bold text-teal-800">${t.n}</p>
+                    <p class="text-[9px] text-red-500 font-bold">+฿${t.p}</p>
                 </div>`).join('');
 
             updateModPrice();
@@ -247,17 +251,25 @@
             updateModPrice();
         }
 
-        function changeQty(v) { selQty = Math.max(1, selQty + v); document.getElementById('mod-qty').value = selQty; updateModPrice(); }
-
-        function updateModPrice() {
-            let total = parseFloat(selP.price);
-            if(selSize) total += selSize.price;
-            selToppings.forEach(t => total += t.price);
-            document.getElementById('mod-total-display').innerText = `${total * selQty} บาท`;
+        function changeQty(v) { 
+            selQty = Math.max(1, selQty + v); 
+            document.getElementById('mod-qty').value = selQty; 
+            updateModPrice(); 
         }
 
+        function updateModPrice() {
+            let base = parseFloat(selP.price);
+            if(selSize) base += selSize.price;
+            selToppings.forEach(t => base += t.price);
+            document.getElementById('mod-total-display').innerText = (base * selQty) + " บาท";
+        }
+
+        // --- 4. การจัดการตะกร้า (CART) ---
         function confirmAddToCart() {
-            if(!selSize) return alert("กรุณาเลือกไซส์สินค้าก่อนเพิ่มลงตะกร้า");
+            if(!selSize) {
+                alert("กรุณาเลือกไซส์ก่อนนะครับ");
+                return;
+            }
             
             const totalSingle = parseFloat(selP.price) + selSize.price + selToppings.reduce((s, t) => s + t.price, 0);
             
@@ -269,28 +281,37 @@
                 finalPrice: totalSingle * selQty
             });
             
+            // ปิดหน้าต่างทันที
+            closeMod(); 
+            
+            // อัปเดตตะกร้าและทำเอฟเฟกต์ Bounce
             updateCartUI();
-            closeMod();
+            const cartTotalEl = document.getElementById('cart-total');
+            cartTotalEl.classList.add('cart-added');
+            setTimeout(() => cartTotalEl.classList.remove('cart-added'), 400);
         }
 
         function updateCartUI() {
             const list = document.getElementById('cart-list');
             if(cart.length === 0) {
-                list.innerHTML = `<div class="flex flex-col items-center justify-center py-20"><div class="bg-gray-100 p-4 rounded-full mb-3">🛍️</div><p>ยังไม่มีสินค้าในตะกร้า</p></div>`;
+                list.innerHTML = `<div class="flex flex-col items-center justify-center py-20 opacity-20"><div class="text-5xl mb-2">🛍️</div><p class="text-xs font-bold uppercase tracking-widest">ยังไม่มีรายการ</p></div>`;
                 document.getElementById('cart-total').innerText = "0 บาท";
                 document.getElementById('cart-bar').classList.add('hidden');
+                document.getElementById('rep-total-top').innerText = "0";
                 return;
             }
 
             list.innerHTML = cart.map((i, idx) => `
-                <div class="bg-gray-50 p-4 rounded-2xl border flex justify-between items-center animate-fade">
-                    <div>
-                        <div class="font-bold text-teal-800">${i.name} (x${i.qty})</div>
-                        <div class="text-[9px] text-gray-400 uppercase">${i.size} | ${i.toppings.join(', ') || 'ไม่มีท็อปปิ้ง'}</div>
+                <div class="bg-gray-50 p-4 rounded-2xl flex justify-between items-center border border-gray-100 anim-up">
+                    <div class="flex-1">
+                        <div class="font-bold text-teal-900 text-sm">${i.name} <span class="text-teal-500 ml-1">x${i.qty}</span></div>
+                        <div class="text-[10px] text-gray-400 font-bold uppercase mt-1">
+                            Size ${i.size} ${i.toppings.length > 0 ? '| ' + i.toppings.join(', ') : ''}
+                        </div>
                     </div>
                     <div class="text-right">
-                        <div class="font-bold text-red-600">${i.finalPrice}.-</div>
-                        <button onclick="removeCart(${idx})" class="text-[10px] text-gray-300 underline uppercase">ลบ</button>
+                        <div class="font-bold text-red-600 text-lg tracking-tighter">${i.finalPrice}.-</div>
+                        <button onclick="removeCart(${idx})" class="text-[9px] text-gray-300 font-bold underline uppercase hover:text-red-400 transition-colors">ลบออก</button>
                     </div>
                 </div>`).join('');
 
@@ -301,12 +322,32 @@
             document.getElementById('cart-qty').innerText = cart.length;
         }
 
-        function removeCart(i) { cart.splice(i, 1); updateCartUI(); }
-        function clearCart() { cart = []; updateCartUI(); }
-        function closeMod() { document.getElementById('mod-modal').classList.add('hidden'); }
-        function openPayment() { alert("ไปหน้าจ่ายเงิน (KBANK QR)..."); }
+        function removeCart(i) { 
+            if(confirm("ลบรายการนี้?")) {
+                cart.splice(i, 1); updateCartUI(); 
+            }
+        }
+        
+        function clearCart() { 
+            if(confirm("ล้างตะกร้าทั้งหมด?")) {
+                cart = []; updateCartUI(); 
+            }
+        }
 
-        showPage('sell');
+        function closeMod() { 
+            document.getElementById('mod-modal').classList.add('hidden'); 
+        }
+
+        function showPage(p) {
+            // ฟังก์ชันเปลี่ยนหน้า (Placeholder)
+            console.log("Change Page to:", p);
+        }
+
+        function openPayment() {
+            const total = cart.reduce((s, i) => s + i.finalPrice, 0);
+            alert("ยอดชำระ: " + total + " บาท\nเชื่อมต่อ KBank PromptPay...");
+        }
+
     </script>
 </body>
 </html>
