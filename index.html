@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>เลื่องชื่อลือชา POS</title>
-    <!-- Firebase SDK (โหลดแบบรวมไฟล์เดียวเพื่อลดปัญหา Connecting) -->
+    <title>เลื่องชื่อลือชา POS Pro</title>
+    <!-- Firebase SDK (Version 8.10.1) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,12 +13,11 @@
     <style>
         :root { --p-blue: #007AFF; --bg-cream: #FDFBF7; --soft-blue: #E3F2FD; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg-cream); color: #334155; touch-action: manipulation; }
-        
-        /* Visual Feedback */
-        .btn-touch { transition: all 0.1s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .btn-touch:active { transform: scale(0.96); background-color: rgba(0, 122, 255, 0.1); filter: brightness(0.9); }
-        .item-selected { border: 3px solid var(--p-blue) !important; background-color: var(--soft-blue) !important; }
+        .btn-touch { transition: all 0.15s ease; cursor: pointer; }
+        .btn-touch:active { transform: scale(0.96); background-color: rgba(0, 122, 255, 0.1); }
+        .card-active:active { background-color: var(--soft-blue); }
         .tab-active { color: var(--p-blue) !important; border-top: 4px solid var(--p-blue); font-weight: 600; }
+        .mod-selected { border-color: var(--p-blue) !important; background-color: var(--soft-blue) !important; }
         .hide-scroll::-webkit-scrollbar { display: none; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .anim-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -26,36 +25,35 @@
 </head>
 <body class="pb-28">
 
-    <!-- CONNECTION OVERLAY (หายไปเมื่อเชื่อมต่อสำเร็จ) -->
+    <!-- CONNECTION OVERLAY -->
     <div id="loading-overlay" class="fixed inset-0 bg-white z-[300] flex flex-col items-center justify-center p-6 text-center">
         <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-        <h2 class="text-xl font-bold text-gray-700">กำลังเชื่อมต่อคลาวด์...</h2>
-        <p class="text-sm text-gray-400 mt-2 italic">เลื่องชื่อลือชา POS Enterprise</p>
-        <button onclick="forceShowApp()" id="force-btn" class="hidden mt-10 text-blue-500 underline text-xs">หากรอนานเกินไป คลิกตรงนี้เพื่อข้าม</button>
+        <h2 class="text-xl font-bold text-gray-700">กำลังเชื่อมต่อฐานข้อมูล...</h2>
+        <p id="error-msg" class="text-xs text-red-500 mt-4 font-mono"></p>
+        <button onclick="forceOpen()" class="mt-8 text-blue-500 underline text-xs">ข้ามการรอเชื่อมต่อ (Force Open)</button>
     </div>
 
     <!-- HEADER -->
     <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-blue-50 shadow-sm">
         <h1 class="text-xl font-bold text-[#004A99]">เลื่องชื่อลือชา</h1>
-        <div id="db-status" class="text-[9px] px-2 py-1 rounded-full font-bold bg-green-50 text-green-500 uppercase tracking-widest">Online</div>
+        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-yellow-100 text-yellow-600 uppercase">Connecting...</div>
     </header>
 
-    <div id="main-view">
-        <!-- 1. REPORT (MuayMoney Style) -->
+    <div id="main-content">
+        <!-- 1. REPORT PAGE -->
         <section id="page-report" class="p-4 hidden">
             <div class="flex gap-2 overflow-x-auto pb-4 hide-scroll">
-                <button onclick="loadReport('today')" class="r-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold">วันนี้</button>
-                <button onclick="loadReport('7days')" class="r-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
-                <button onclick="loadReport('30days')" class="r-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
+                <button onclick="updateReport('today')" class="r-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold shadow-sm">วันนี้</button>
+                <button onclick="updateReport('7days')" class="r-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
+                <button onclick="updateReport('30days')" class="r-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
             </div>
-
-            <!-- Financial Summary -->
+            
             <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
-                <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">ยอดขายทั้งหมด</p>
-                <h2 id="rep-sales" class="text-6xl font-bold text-blue-600 tracking-tighter">฿0</h2>
+                <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">ยอดขายรวม</p>
+                <h2 id="rep-sales" class="text-5xl font-bold text-blue-600 tracking-tighter">฿0</h2>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="grid grid-cols-2 gap-3 mb-6 text-center">
                 <div class="bg-green-50 p-5 rounded-3xl border border-green-100">
                     <p class="text-[9px] text-green-600 font-bold uppercase">กำไรสุทธิ</p>
                     <p id="rep-profit" class="text-xl font-bold text-green-700">฿0</p>
@@ -66,24 +64,24 @@
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6">
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-8">
                 <p class="text-xs font-bold text-gray-400 uppercase text-center mb-4">ช่องทางการชำระเงิน</p>
                 <canvas id="salesChart"></canvas>
             </div>
 
             <div class="space-y-3 mb-8">
-                <div class="bg-blue-50 p-4 rounded-2xl flex justify-between">
-                    <span class="text-sm font-bold">🛵 ยอดเดลิเวอรี</span>
+                <div class="bg-blue-50 p-4 rounded-2xl flex justify-between items-center">
+                    <span class="text-sm font-bold">🛵 เดลิเวอรี</span>
                     <span id="rep-deli" class="font-bold text-blue-600">฿0</span>
                 </div>
-                <div class="bg-white p-4 rounded-2xl flex justify-between border">
-                    <span class="text-sm font-bold">💰 ต้นทุนรวม</span>
+                <div class="bg-white p-4 rounded-2xl flex justify-between items-center border">
+                    <span class="text-sm font-bold">💰 ต้นทุนสินค้า</span>
                     <span id="rep-cost" class="font-bold text-gray-400">฿0</span>
                 </div>
             </div>
         </section>
 
-        <!-- 2. SELL (POS) -->
+        <!-- 2. SELL PAGE (POS) -->
         <section id="page-sell" class="p-4 block">
             <div class="mb-4">
                 <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนู..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
@@ -92,30 +90,30 @@
             <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-32"></div>
         </section>
 
-        <!-- 3. KITCHEN -->
+        <!-- 3. KITCHEN PAGE -->
         <section id="page-kitchen" class="p-4 hidden">
-            <h2 class="text-xl font-bold mb-6">ครัว (รอทำ)</h2>
+            <h2 class="text-xl font-bold mb-6">ออเดอร์ห้องครัว</h2>
             <div id="kitchen-list" class="space-y-4"></div>
         </section>
 
-        <!-- 4. STOCK (Visual Control) -->
+        <!-- 4. STOCK PAGE -->
         <section id="page-stock" class="p-4 hidden">
             <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-blue-600 p-4 rounded-3xl text-white shadow-lg">
-                    <p class="text-[9px] font-bold uppercase opacity-70">สินค้า</p>
-                    <p id="stk-count" class="text-2xl font-bold">0</p>
+                <div class="bg-blue-600 p-5 rounded-3xl text-white shadow-lg text-center">
+                    <p class="text-[9px] font-bold uppercase opacity-70">สินค้าในระบบ</p>
+                    <p id="stk-count" class="text-3xl font-bold">0</p>
                 </div>
-                <div class="bg-white p-4 rounded-3xl border border-blue-50">
+                <div class="bg-white p-5 rounded-3xl border border-blue-50 shadow-sm text-center">
                     <p class="text-[9px] font-bold uppercase text-gray-400">มูลค่าคลัง</p>
-                    <p id="stk-value" class="text-2xl font-bold text-blue-600">฿0</p>
+                    <p id="stk-value" class="text-3xl font-bold text-blue-600">฿0</p>
                 </div>
             </div>
             <div class="flex justify-between items-center mb-6 px-2">
-                <h3 class="font-bold">คลังสินค้า</h3>
-                <button onclick="openAdminModal()" class="btn-touch bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-bold">+ เพิ่มเมนู</button>
+                <h3 class="font-bold">รายการเมนู</h3>
+                <button onclick="openAdminModal()" class="btn-touch bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md">+ เพิ่มเมนู</button>
             </div>
-            <div id="admin-list" class="space-y-3 mb-10"></div>
-            <button onclick="seedData()" class="w-full py-4 text-gray-300 text-[9px] font-bold uppercase italic border-2 border-dashed rounded-3xl">✨ ติดตั้งสินค้าเบื้องต้น (Seed Data)</button>
+            <div id="admin-list" class="space-y-3 mb-8"></div>
+            <button onclick="seedData()" class="w-full py-4 text-gray-300 text-[9px] font-bold uppercase italic border-2 border-dashed rounded-3xl">✨ คลิกเพื่อติดตั้งสินค้าเริ่มต้น</button>
         </section>
     </div>
 
@@ -123,58 +121,10 @@
     <div id="cart-bar" class="fixed bottom-24 left-4 right-4 bg-white p-5 rounded-[2.5rem] shadow-2xl flex justify-between items-center hidden z-40 border border-blue-50 animate-bounce">
         <div class="flex items-center gap-4">
             <div id="cart-qty" class="bg-blue-600 text-white w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold font-mono">0</div>
-            <div id="cart-total" class="text-2xl font-bold text-[#004A99] font-mono tracking-tighter">฿0</div>
+            <div id="cart-total" class="text-2xl font-bold text-[#004A99] tracking-tighter">฿0</div>
         </div>
         <button onclick="openCheckout()" class="btn-touch bg-blue-600 text-white px-10 py-3 rounded-2xl font-bold text-sm shadow-md">ชำระเงิน</button>
     </div>
 
-    <!-- BOTTOM TAB -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-50 flex justify-around p-3 pb-8 z-50">
-        <button onclick="showPage('report')" id="nav-report" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
-            <span class="text-xl">📊</span><span class="text-[9px] font-bold uppercase">Report</span>
-        </button>
-        <button onclick="showPage('sell')" id="nav-sell" class="flex flex-col items-center gap-1 text-gray-300 tab-active btn-touch">
-            <span class="text-xl">🛒</span><span class="text-[9px] font-bold uppercase">Sell</span>
-        </button>
-        <button onclick="showPage('kitchen')" id="nav-kitchen" class="flex flex-col items-center gap-1 text-gray-300 relative btn-touch">
-            <span class="text-xl">👨‍🍳</span><span id="k-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1.5 rounded-full hidden">0</span>
-            <span class="text-[9px] font-bold uppercase">Kitchen</span>
-        </button>
-        <button onclick="showPage('stock')" id="nav-stock" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
-            <span class="text-xl">📦</span><span class="text-[9px] font-bold uppercase">Stock</span>
-        </button>
-    </nav>
-
-    <!-- MODAL: MODIFIERS -->
-    <div id="mod-modal" class="fixed inset-0 bg-black/60 hidden z-[100] flex items-end">
-        <div class="bg-white w-full rounded-t-[3rem] p-8 max-h-[85vh] overflow-y-auto anim-up">
-            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
-            <h3 id="mod-p-name" class="text-2xl font-bold mb-1">เมนูสินค้า</h3>
-            <p id="mod-p-price" class="text-blue-600 font-bold mb-6">฿0</p>
-            <div id="mod-list" class="space-y-6"></div>
-            <div class="flex justify-between items-center sticky bottom-0 bg-white pt-6 border-t mt-8">
-                <p id="mod-total" class="text-3xl font-bold text-red-600">฿0</p>
-                <button onclick="addCartWithMods()" class="bg-blue-600 text-white px-12 py-4 rounded-[2rem] font-bold shadow-lg btn-touch">ยืนยัน</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: ADMIN (Add/Edit) -->
-    <div id="admin-modal" class="fixed inset-0 bg-black/60 hidden z-[110] flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
-            <h2 class="text-2xl font-bold mb-6">ข้อมูลสินค้า</h2>
-            <div class="space-y-4">
-                <div class="flex flex-col items-center">
-                    <img id="admin-preview" class="w-32 h-32 rounded-3xl object-cover bg-gray-50 border mb-2">
-                    <label class="bg-blue-50 text-blue-600 text-[10px] font-bold px-5 py-2.5 rounded-full cursor-pointer border border-blue-100 uppercase btn-touch">
-                        + เลือกรูป JPG/PNG
-                        <input type="file" id="img-input" accept="image/*" class="hidden" onchange="previewImg(event)">
-                    </label>
-                </div>
-                <input type="text" id="admin-name" placeholder="ชื่อสินค้า" class="w-full p-4 bg-gray-50 rounded-2xl outline-none border-none shadow-inner">
-                <div class="grid grid-cols-2 gap-2">
-                    <input type="number" id="admin-price" placeholder="ราคาขาย" class="p-4 bg-gray-50 rounded-2xl border-none">
-                    <input type="number" id="admin-cost" placeholder="ต้นทุน" class="p-4 bg-gray-50 rounded-2xl border-none">
-                </div>
-                <input type="number" id="admin-stock" placeholder="สต็อก" class="w-full p-4 bg-gray-50 rounded-2xl border-none">
-                <input type="text" id="admin-cat" placeholder="หมวดหมู่ (เช่น อาหาร, เครื่องดื่ม)" class="w-full p-4 bg-gr
+    <!-- BOTTOM TAB NAVIGATION -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-50 flex justify-around p-3 p
