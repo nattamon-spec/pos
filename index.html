@@ -11,46 +11,113 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root { --p-blue: #007AFF; --bg-cream: #FDFBF7; --soft-blue: #E3F2FD; }
+        :root { --p-blue: #007AFF; --bg-cream: #FDFBF7; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg-cream); color: #334155; touch-action: manipulation; }
-        
         .btn-touch { transition: all 0.1s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .btn-touch:active { transform: scale(0.95); background-color: var(--soft-blue); }
-        .card-active:active { background-color: var(--soft-blue); border-color: var(--p-blue); }
-
+        .btn-touch:active { transform: scale(0.95); background-color: #E3F2FD; }
         .tab-active { color: var(--p-blue) !important; border-top: 4px solid var(--p-blue); font-weight: 600; }
-        .mod-selected { border: 3px solid var(--p-blue) !important; background-color: var(--soft-blue) !important; }
+        .mod-selected { border: 3px solid var(--p-blue) !important; background-color: #E3F2FD !important; }
         .hide-scroll::-webkit-scrollbar { display: none; }
-        
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .anim-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
     </style>
 </head>
 <body class="pb-28">
 
     <!-- HEADER -->
     <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-blue-50 shadow-sm">
-        <h1 class="text-xl font-bold text-[#004A99] tracking-tighter uppercase">เลื่องชื่อลือชา</h1>
-        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-500 uppercase tracking-widest">● ออนไลน์</div>
+        <h1 class="text-xl font-bold text-[#004A99] uppercase tracking-tighter">เลื่องชื่อลือชา</h1>
+        <div id="db-status" class="text-[9px] px-2 py-1 rounded-full font-bold bg-green-50 text-green-500 uppercase">● ออนไลน์</div>
     </header>
 
+    <!-- CONTENT AREA -->
     <div id="main-content">
-        <!-- 1. REPORTS -->
-        <section id="page-report" class="p-4 hidden anim-up">
-            <div class="flex gap-2 overflow-x-auto pb-4 hide-scroll">
-                <button onclick="updateStats('today')" class="range-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold">วันนี้</button>
-                <button onclick="updateStats('7days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
-                <button onclick="updateStats('30days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
+        <!-- 1. SELL (POS) -->
+        <section id="page-sell" class="p-4 block">
+            <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-center">
+                <div class="text-5xl mb-4">🍚</div>
+                <h2 class="text-xl font-bold text-gray-400 mb-6">ยังไม่มีข้อมูลสินค้าในระบบ</h2>
+                <button onclick="seedInitialData()" class="bg-blue-600 text-white px-10 py-4 rounded-[2rem] font-bold shadow-lg btn-touch">✨ กดตรงนี้เพื่อเริ่มระบบ</button>
             </div>
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
-                <p class="text-[10px] font-bold text-blue-400 uppercase mb-1">ยอดขายทั้งหมด</p>
-                <h2 id="rep-total" class="text-6xl font-bold text-blue-600 tracking-tighter">฿0</h2>
+            
+            <div id="pos-ui" class="hidden">
+                <div class="mb-4">
+                    <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนู..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
+                </div>
+                <div id="pos-cats" class="flex gap-2 overflow-x-auto pb-4 hide-scroll mb-2"></div>
+                <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-32"></div>
+            </div>
+        </section>
+
+        <!-- 2. REPORT -->
+        <section id="page-report" class="p-4 hidden">
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
+                <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">ยอดขายวันนี้</p>
+                <h2 id="rep-total" class="text-5xl font-bold text-blue-600 tracking-tighter">฿0</h2>
             </div>
             <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-green-50 p-5 rounded-3xl border border-green-100 text-center">
+                <div class="bg-green-50 p-4 rounded-3xl border border-green-100 text-center">
                     <p class="text-[9px] text-green-600 font-bold uppercase">กำไรสุทธิ</p>
                     <p id="rep-profit" class="text-xl font-bold text-green-700">฿0</p>
                 </div>
-                <div class="bg-orange-50 p-5 rounded-3xl border border-orange-100 text-center">
+                <div class="bg-orange-50 p-4 rounded-3xl border border-orange-100 text-center">
                     <p class="text-[9px] text-orange-600 font-bold uppercase">ภาษี 7%</p>
-                    <
+                    <p id="rep-tax" class="text-xl font-bold text-orange-700">฿0</p>
+                </div>
+            </div>
+            <canvas id="salesChart" class="mb-10"></canvas>
+            <div id="staff-report" class="space-y-2 mb-10"></div>
+        </section>
+
+        <!-- 3. KITCHEN -->
+        <section id="page-kitchen" class="p-4 hidden">
+            <h2 class="text-xl font-bold mb-6 italic uppercase">ห้องครัว</h2>
+            <div id="kitchen-list" class="space-y-4"></div>
+        </section>
+
+        <!-- 4. STOCK -->
+        <section id="page-stock" class="p-4 hidden">
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-blue-600 p-5 rounded-3xl text-white shadow-lg text-center">
+                    <p class="text-[9px] font-bold uppercase opacity-70">สินค้า</p>
+                    <p id="stk-count" class="text-3xl font-bold">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-3xl border border-blue-50 text-blue-600 text-center shadow-sm">
+                    <p class="text-[9px] font-bold uppercase opacity-50">มูลค่าคลัง</p>
+                    <p id="stk-value" class="text-2xl font-bold tracking-tighter font-mono">฿0</p>
+                </div>
+            </div>
+            <div class="flex justify-between items-center mb-6 px-2">
+                <h3 class="font-bold">จัดการเมนู</h3>
+                <button onclick="openProductModal()" class="btn-touch bg-blue-600 text-white px-6 py-2.5 rounded-2xl text-xs font-bold shadow-md">+ เพิ่มเมนู</button>
+            </div>
+            <div id="admin-list" class="space-y-3 mb-10"></div>
+        </section>
+    </div>
+
+    <!-- CART BAR -->
+    <div id="cart-bar" class="fixed bottom-24 left-4 right-4 bg-white p-5 rounded-[2.5rem] shadow-2xl flex justify-between items-center hidden z-40 border border-blue-50 animate-bounce">
+        <div class="flex items-center gap-4">
+            <div id="cart-qty" class="bg-blue-600 text-white w-9 h-9 flex items-center justify-center rounded-full text-sm font-bold">0</div>
+            <div id="cart-total" class="text-2xl font-bold text-[#004A99] tracking-tighter">฿0</div>
+        </div>
+        <button onclick="openCheckout()" class="btn-touch bg-blue-600 text-white px-10 py-3 rounded-2xl font-bold text-sm uppercase">ชำระเงิน</button>
+    </div>
+
+    <!-- BOTTOM TAB NAVIGATION -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-50 flex justify-around p-3 pb-8 z-50 shadow-2xl">
+        <button onclick="showPage('report')" id="nav-report" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
+            <span class="text-xl">📊</span><span class="text-[9px] font-bold uppercase">Report</span>
+        </button>
+        <button onclick="showPage('sell')" id="nav-sell" class="flex flex-col items-center gap-1 text-gray-300 tab-active btn-touch">
+            <span class="text-xl">🛒</span><span class="text-[9px] font-bold uppercase">Sell</span>
+        </button>
+        <button onclick="showPage('kitchen')" id="nav-kitchen" class="flex flex-col items-center gap-1 text-gray-300 relative btn-touch">
+            <span class="text-xl">👨‍🍳</span><span id="k-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1.5 rounded-full hidden">0</span>
+            <span class="text-[9px] font-bold uppercase">Kitchen</span>
+        </button>
+        <button onclick="showPage('stock')" id="nav-stock" class="flex flex-col items-center gap-1 text-gray-300 btn-touch">
+            <span class="text-xl">📦</span><span class="text-[9px] font-bold uppercase">Stock</span>
+        </button>
+    </nav>
+
+    <!-- MODAL: MODIFIERS -->
+    <div id="mod-modal" class="fixed inset-0
