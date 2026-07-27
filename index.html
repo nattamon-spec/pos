@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>เลื่องชื่อลือชา POS Pro</title>
+    <title>เลื่องชื่อลือชา POS - Enterprise</title>
     <!-- Firebase SDK 8.10.1 -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -14,9 +14,9 @@
         :root { --p-blue: #007AFF; --bg-cream: #FDFBF7; --soft-blue: #E3F2FD; }
         body { font-family: 'Kanit', sans-serif; background-color: var(--bg-cream); color: #334155; touch-action: manipulation; }
         
-        /* Visual Feedback */
+        /* Visual Feedback - จิ้มแล้วแรเงาสีฟ้า */
         .btn-touch { transition: all 0.1s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .btn-touch:active { transform: scale(0.95); background-color: var(--soft-blue); }
+        .btn-touch:active { transform: scale(0.95); background-color: var(--soft-blue); filter: brightness(0.9); }
         .card-active:active { background-color: var(--soft-blue); border-color: var(--p-blue); }
 
         .tab-active { color: var(--p-blue) !important; border-top: 4px solid var(--p-blue); font-weight: 600; }
@@ -32,25 +32,43 @@
     <!-- HEADER -->
     <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 border-b border-blue-50 shadow-sm">
         <h1 class="text-xl font-bold text-[#004A99] uppercase tracking-tighter italic">เลื่องชื่อลือชา</h1>
-        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-600 uppercase">● ออนไลน์</div>
+        <div id="db-status" class="text-[9px] px-2.5 py-1 rounded-full font-bold bg-green-50 text-green-600 uppercase tracking-widest italic">● ระบบออนไลน์</div>
     </header>
 
-    <!-- MAIN VIEW -->
     <div id="main-content">
-        <!-- 1. SELL (POS) -->
-        <section id="page-sell" class="p-4 block">
+        <!-- 1. SELL PAGE (POS) -->
+        <section id="page-sell" class="p-4 block anim-up">
             <div class="mb-4">
-                <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาสินค้า..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
+                <input type="text" id="search" oninput="renderPOS()" placeholder="🔍 ค้นหาเมนูสินค้า..." class="w-full p-4 rounded-2xl bg-white shadow-sm border-none outline-none ring-1 ring-blue-50">
             </div>
             <div id="pos-cats" class="flex gap-2 overflow-x-auto pb-4 hide-scroll mb-2"></div>
             <div id="pos-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-32">
-                <div class="col-span-full py-20 text-center text-gray-300 italic">กำลังเชื่อมต่อข้อมูลสินค้า...</div>
+                <div class="col-span-full py-20 text-center text-gray-300 italic">กำลังเชื่อมต่อข้อมูล...</div>
             </div>
         </section>
 
-        <!-- 2. REPORT -->
+        <!-- 2. REPORT (Advanced Analytics) -->
         <section id="page-report" class="p-4 hidden anim-up">
             <div class="flex gap-2 overflow-x-auto pb-4 hide-scroll">
                 <button onclick="updateStats('today')" class="range-btn btn-touch bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-bold shadow-sm">วันนี้</button>
                 <button onclick="updateStats('7days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">7 วัน</button>
-                <button onclick="updateStats('30days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full
+                <button onclick="updateStats('30days')" class="range-btn btn-touch bg-white border px-5 py-2 rounded-full text-xs">30 วัน</button>
+            </div>
+
+            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-blue-50 mb-6 text-center">
+                <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">ยอดขายสุทธิ</p>
+                <h2 id="rep-total" class="text-5xl font-bold text-blue-600 tracking-tighter">฿0</h2>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-green-50 p-5 rounded-3xl border border-green-100 text-center">
+                    <p class="text-[9px] text-green-600 font-bold uppercase">กำไรสุทธิ</p>
+                    <p id="rep-profit" class="text-xl font-bold text-green-700 font-mono">฿0</p>
+                </div>
+                <div class="bg-orange-50 p-5 rounded-3xl border border-orange-100 text-center">
+                    <p class="text-[9px] text-orange-600 font-bold uppercase">ภาษี 7%</p>
+                    <p id="rep-tax" class="text-xl font-bold text-orange-700 font-mono">฿0</p>
+                </div>
+            </div>
+
+            <div cl
