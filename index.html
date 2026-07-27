@@ -23,165 +23,167 @@
     </style>
 </head>
 <body class="bg-gray-50 text-slate-800">
+
 <div id="app" class="flex h-screen overflow-hidden">
-code
-Code
-<!-- ฝั่งซ้าย: รายการสินค้า -->
-<div class="flex-1 flex flex-col h-full p-4 md:p-6 overflow-hidden no-print">
-    <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div>
-            <h1 class="text-3xl font-black text-amber-900 tracking-tight">เลื่องชื่อลือชา</h1>
-            <p class="text-amber-600 text-sm font-bold">POS SYSTEM VER. ร่างทอง 100%</p>
-        </div>
-        <div class="relative w-full md:w-72">
-            <span class="absolute left-3 top-3 text-gray-400"><i data-lucide="search" size="18"></i></span>
-            <input v-model="searchQuery" type="text" placeholder="ค้นหาเครื่องดื่ม..." 
-                class="w-full pl-10 pr-4 py-3 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-amber-500 outline-none">
-        </div>
-    </header>
-
-    <!-- หมวดหมู่ -->
-    <div class="flex gap-2 mb-6 overflow-x-auto pb-2 custom-scroll">
-        <button v-for="cat in categories" :key="cat" 
-            @click="activeCategory = cat"
-            :class="['px-6 py-2 rounded-full font-semibold transition-all whitespace-nowrap', 
-            activeCategory === cat ? 'bg-amber-600 text-white shadow-lg shadow-amber-200' : 'bg-white hover:bg-amber-50']">
-            {{ cat }}
-        </button>
-    </div>
-
-    <!-- Grid สินค้า -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 overflow-y-auto custom-scroll pr-2">
-        <div v-for="product in filteredProducts" :key="product.id" 
-            @click="addToCart(product)"
-            class="product-card bg-white p-3 rounded-[2rem] shadow-sm hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-amber-400 group">
-            <div class="relative overflow-hidden rounded-[1.5rem] mb-3 aspect-square">
-                <img :src="product.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+    
+    <!-- ฝั่งซ้าย: รายการสินค้า -->
+    <div class="flex-1 flex flex-col h-full p-4 md:p-6 overflow-hidden no-print">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div>
+                <h1 class="text-3xl font-black text-amber-900 tracking-tight">เลื่องชื่อลือชา</h1>
+                <p class="text-amber-600 text-sm font-bold">POS SYSTEM VER. ร่างทอง 100%</p>
             </div>
-            <h3 class="font-bold text-gray-700 truncate px-1">{{ product.name }}</h3>
-            <div class="flex justify-between items-center mt-1 px-1">
-                <span class="text-amber-600 font-black text-lg">{{ product.price }} ฿</span>
-                <span class="bg-gray-100 p-1 rounded-lg text-gray-400 group-hover:bg-amber-100 group-hover:text-amber-600 transition-colors">
-                    <i data-lucide="plus" size="16"></i>
-                </span>
+            <div class="relative w-full md:w-72">
+                <span class="absolute left-3 top-3 text-gray-400"><i data-lucide="search" size="18"></i></span>
+                <input v-model="searchQuery" type="text" placeholder="ค้นหาเครื่องดื่ม..." 
+                    class="w-full pl-10 pr-4 py-3 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-amber-500 outline-none">
             </div>
-        </div>
-    </div>
-</div>
+        </header>
 
-<!-- ฝั่งขวา: ตะกร้าสินค้า -->
-<div class="w-full md:w-[400px] bg-white shadow-2xl flex flex-col border-l border-gray-100 no-print">
-    <div class="p-6 flex justify-between items-center border-b">
-        <div class="flex items-center gap-3">
-            <div class="bg-amber-100 p-2 rounded-xl text-amber-600">
-                <i data-lucide="shopping-cart"></i>
-            </div>
-            <h2 class="text-xl font-black">รายการสั่งซื้อ</h2>
+        <!-- หมวดหมู่ -->
+        <div class="flex gap-2 mb-6 overflow-x-auto pb-2 custom-scroll">
+            <button v-for="cat in categories" :key="cat" 
+                @click="activeCategory = cat"
+                :class="['px-6 py-2 rounded-full font-semibold transition-all whitespace-nowrap', 
+                activeCategory === cat ? 'bg-amber-600 text-white shadow-lg shadow-amber-200' : 'bg-white hover:bg-amber-50']">
+                {{ cat }}
+            </button>
         </div>
-        <button @click="clearCart" class="text-gray-400 hover:text-red-500 transition-colors">
-            <i data-lucide="trash-2"></i>
-        </button>
-    </div>
 
-    <!-- รายการในตะกร้า -->
-    <div class="flex-1 overflow-y-auto p-6 space-y-4 custom-scroll">
-        <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-gray-400 opacity-50">
-            <i data-lucide="coffee" size="48" class="mb-2"></i>
-            <p>ยังไม่มีสินค้าในตะกร้า</p>
-        </div>
-        <div v-for="item in cart" :key="item.id" class="flex items-center gap-4 bg-gray-50 p-3 rounded-2xl">
-            <img :src="item.image" class="w-14 h-14 rounded-xl object-cover shadow-sm">
-            <div class="flex-1">
-                <h4 class="font-bold text-sm leading-tight">{{ item.name }}</h4>
-                <p class="text-amber-600 font-black text-sm">{{ item.price * item.quantity }} ฿</p>
-            </div>
-            <div class="flex items-center bg-white rounded-xl p-1 shadow-sm border">
-                <button @click="updateQty(item.id, -1)" class="p-1 hover:bg-gray-100 rounded-lg transition"><i data-lucide="minus" size="14"></i></button>
-                <span class="w-8 text-center font-bold text-sm">{{ item.quantity }}</span>
-                <button @click="updateQty(item.id, 1)" class="p-1 hover:bg-gray-100 rounded-lg transition"><i data-lucide="plus" size="14"></i></button>
+        <!-- Grid สินค้า -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 overflow-y-auto custom-scroll pr-2">
+            <div v-for="product in filteredProducts" :key="product.id" 
+                @click="addToCart(product)"
+                class="product-card bg-white p-3 rounded-[2rem] shadow-sm hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-amber-400 group">
+                <div class="relative overflow-hidden rounded-[1.5rem] mb-3 aspect-square">
+                    <img :src="product.image" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                </div>
+                <h3 class="font-bold text-gray-700 truncate px-1">{{ product.name }}</h3>
+                <div class="flex justify-between items-center mt-1 px-1">
+                    <span class="text-amber-600 font-black text-lg">{{ product.price }} ฿</span>
+                    <span class="bg-gray-100 p-1 rounded-lg text-gray-400 group-hover:bg-amber-100 group-hover:text-amber-600 transition-colors">
+                        <i data-lucide="plus" size="16"></i>
+                    </span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- สรุปยอด -->
-    <div class="p-6 bg-gray-50 rounded-t-[2.5rem] shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
-        <div class="space-y-2 mb-4">
-            <div class="flex justify-between text-gray-500 font-medium">
-                <span>จำนวนทั้งหมด</span>
-                <span>{{ totalItems }} แก้ว</span>
+    <!-- ฝั่งขวา: ตะกร้าสินค้า -->
+    <div class="w-full md:w-[400px] bg-white shadow-2xl flex flex-col border-l border-gray-100 no-print">
+        <div class="p-6 flex justify-between items-center border-b">
+            <div class="flex items-center gap-3">
+                <div class="bg-amber-100 p-2 rounded-xl text-amber-600">
+                    <i data-lucide="shopping-cart"></i>
+                </div>
+                <h2 class="text-xl font-black">รายการสั่งซื้อ</h2>
             </div>
-            <div class="flex justify-between text-2xl font-black text-slate-900">
-                <span>ยอดรวมสุทธิ</span>
-                <span class="text-amber-600">{{ totalPrice.toLocaleString() }} ฿</span>
+            <button @click="clearCart" class="text-gray-400 hover:text-red-500 transition-colors">
+                <i data-lucide="trash-2"></i>
+            </button>
+        </div>
+
+        <!-- รายการในตะกร้า -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-4 custom-scroll">
+            <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-gray-400 opacity-50">
+                <i data-lucide="coffee" size="48" class="mb-2"></i>
+                <p>ยังไม่มีสินค้าในตะกร้า</p>
             </div>
-        </div>
-        <button @click="openPayment" :disabled="cart.length === 0"
-            class="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-2xl font-bold text-xl shadow-lg shadow-amber-200 transition-all active:scale-[0.98] disabled:bg-gray-300 disabled:shadow-none">
-            ชำระเงิน
-        </button>
-    </div>
-</div>
-
-<!-- Modal ชำระเงิน -->
-<div v-if="showPayment" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 no-print">
-    <div class="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl">
-        <div class="text-center mb-6">
-            <h2 class="text-3xl font-black text-slate-800">รับชำระเงิน</h2>
-            <p class="text-gray-500">กรุณาระบุจำนวนเงินที่รับมา</p>
-        </div>
-
-        <div class="bg-amber-50 p-6 rounded-[2rem] mb-6 text-center">
-            <p class="text-amber-700 font-bold mb-1">ยอดที่ต้องชำระ</p>
-            <h3 class="text-5xl font-black text-amber-600">{{ totalPrice.toLocaleString() }} <span class="text-2xl">฿</span></h3>
-        </div>
-
-        <div class="space-y-4">
-            <input v-model.number="cashReceived" type="number" placeholder="0.00" autofocus
-                class="w-full text-4xl font-black p-6 bg-gray-100 rounded-[2rem] border-none focus:ring-4 focus:ring-amber-500/20 text-center outline-none">
-            
-            <div v-if="cashReceived >= totalPrice" class="text-center p-4 bg-green-50 rounded-2xl animate-bounce">
-                <p class="text-green-600 font-bold">เงินทอน</p>
-                <p class="text-4xl font-black text-green-700">{{ (cashReceived - totalPrice).toLocaleString() }} ฿</p>
+            <div v-for="item in cart" :key="item.id" class="flex items-center gap-4 bg-gray-50 p-3 rounded-2xl">
+                <img :src="item.image" class="w-14 h-14 rounded-xl object-cover shadow-sm">
+                <div class="flex-1">
+                    <h4 class="font-bold text-sm leading-tight">{{ item.name }}</h4>
+                    <p class="text-amber-600 font-black text-sm">{{ item.price * item.quantity }} ฿</p>
+                </div>
+                <div class="flex items-center bg-white rounded-xl p-1 shadow-sm border">
+                    <button @click="updateQty(item.id, -1)" class="p-1 hover:bg-gray-100 rounded-lg transition"><i data-lucide="minus" size="14"></i></button>
+                    <span class="w-8 text-center font-bold text-sm">{{ item.quantity }}</span>
+                    <button @click="updateQty(item.id, 1)" class="p-1 hover:bg-gray-100 rounded-lg transition"><i data-lucide="plus" size="14"></i></button>
+                </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4 mt-8">
-            <button @click="showPayment = false" class="py-4 rounded-2xl font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition">ยกเลิก</button>
-            <button @click="completeSale" :disabled="cashReceived < totalPrice"
-                class="py-4 rounded-2xl font-bold bg-slate-900 text-white hover:bg-black transition disabled:bg-gray-200">
-                ยืนยัน / พิมพ์ใบเสร็จ
+        <!-- สรุปยอด -->
+        <div class="p-6 bg-gray-50 rounded-t-[2.5rem] shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+            <div class="space-y-2 mb-4">
+                <div class="flex justify-between text-gray-500 font-medium">
+                    <span>จำนวนทั้งหมด</span>
+                    <span>{{ totalItems }} แก้ว</span>
+                </div>
+                <div class="flex justify-between text-2xl font-black text-slate-900">
+                    <span>ยอดรวมสุทธิ</span>
+                    <span class="text-amber-600">{{ totalPrice.toLocaleString() }} ฿</span>
+                </div>
+            </div>
+            <button @click="openPayment" :disabled="cart.length === 0"
+                class="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-2xl font-bold text-xl shadow-lg shadow-amber-200 transition-all active:scale-[0.98] disabled:bg-gray-300 disabled:shadow-none">
+                ชำระเงิน
             </button>
         </div>
     </div>
+
+    <!-- Modal ชำระเงิน -->
+    <div v-if="showPayment" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 no-print">
+        <div class="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl">
+            <div class="text-center mb-6">
+                <h2 class="text-3xl font-black text-slate-800">รับชำระเงิน</h2>
+                <p class="text-gray-500">กรุณาระบุจำนวนเงินที่รับมา</p>
+            </div>
+
+            <div class="bg-amber-50 p-6 rounded-[2rem] mb-6 text-center">
+                <p class="text-amber-700 font-bold mb-1">ยอดที่ต้องชำระ</p>
+                <h3 class="text-5xl font-black text-amber-600">{{ totalPrice.toLocaleString() }} <span class="text-2xl">฿</span></h3>
+            </div>
+
+            <div class="space-y-4">
+                <input v-model.number="cashReceived" type="number" placeholder="0.00" autofocus
+                    class="w-full text-4xl font-black p-6 bg-gray-100 rounded-[2rem] border-none focus:ring-4 focus:ring-amber-500/20 text-center outline-none">
+                
+                <div v-if="cashReceived >= totalPrice" class="text-center p-4 bg-green-50 rounded-2xl animate-bounce">
+                    <p class="text-green-600 font-bold">เงินทอน</p>
+                    <p class="text-4xl font-black text-green-700">{{ (cashReceived - totalPrice).toLocaleString() }} ฿</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mt-8">
+                <button @click="showPayment = false" class="py-4 rounded-2xl font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition">ยกเลิก</button>
+                <button @click="completeSale" :disabled="cashReceived < totalPrice"
+                    class="py-4 rounded-2xl font-bold bg-slate-900 text-white hover:bg-black transition disabled:bg-gray-200">
+                    ยืนยัน / พิมพ์ใบเสร็จ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ใบเสร็จ (ซ่อนไว้เพื่อพิมพ์) -->
+    <div id="receipt" class="hidden print-only p-8 text-sm w-80 mx-auto text-center">
+        <h2 class="text-xl font-bold">เลื่องชื่อลือชา</h2>
+        <p>สาขาต้นตำรับ</p>
+        <div class="border-t border-dashed my-4"></div>
+        <div v-for="item in cart" class="flex justify-between my-1">
+            <span>{{ item.name }} x {{ item.quantity }}</span>
+            <span>{{ item.price * item.quantity }}</span>
+        </div>
+        <div class="border-t border-dashed my-4"></div>
+        <div class="flex justify-between font-bold text-lg">
+            <span>รวมทั้งสิ้น</span>
+            <span>{{ totalPrice }} ฿</span>
+        </div>
+        <div class="flex justify-between mt-1">
+            <span>รับเงิน</span>
+            <span>{{ cashReceived }} ฿</span>
+        </div>
+        <div class="flex justify-between">
+            <span>เงินทอน</span>
+            <span>{{ cashReceived - totalPrice }} ฿</span>
+        </div>
+        <div class="border-t border-dashed my-4"></div>
+        <p>ขอบคุณที่ใช้บริการ</p>
+        <p>{{ new Date().toLocaleString() }}</p>
+    </div>
+
 </div>
 
-<!-- ใบเสร็จ (ซ่อนไว้เพื่อพิมพ์) -->
-<div id="receipt" class="hidden print-only p-8 text-sm w-80 mx-auto text-center">
-    <h2 class="text-xl font-bold">เลื่องชื่อลือชา</h2>
-    <p>สาขาต้นตำรับ</p>
-    <div class="border-t border-dashed my-4"></div>
-    <div v-for="item in cart" class="flex justify-between my-1">
-        <span>{{ item.name }} x {{ item.quantity }}</span>
-        <span>{{ item.price * item.quantity }}</span>
-    </div>
-    <div class="border-t border-dashed my-4"></div>
-    <div class="flex justify-between font-bold text-lg">
-        <span>รวมทั้งสิ้น</span>
-        <span>{{ totalPrice }} ฿</span>
-    </div>
-    <div class="flex justify-between mt-1">
-        <span>รับเงิน</span>
-        <span>{{ cashReceived }} ฿</span>
-    </div>
-    <div class="flex justify-between">
-        <span>เงินทอน</span>
-        <span>{{ cashReceived - totalPrice }} ฿</span>
-    </div>
-    <div class="border-t border-dashed my-4"></div>
-    <p>ขอบคุณที่ใช้บริการ</p>
-    <p>{{ new Date().toLocaleString() }}</p>
-</div>
-</div>
 <script>
     const { createApp, ref, computed, onMounted, watch } = Vue;
 
@@ -272,5 +274,6 @@ Code
         }
     }).mount('#app');
 </script>
+
 </body>
 </html>
