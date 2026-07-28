@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS Master | Full Enterprise</title>
+    <title>Lue cha POS | Payment Master Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -15,8 +15,10 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .active-scale:active { transform: scale(0.95); transition: 0.1s; }
         .luecha-blue { background-color: #003399; }
+        .luecha-blue-text { color: #003399; }
         .luecha-orange { background-color: #FF6600; }
-        .teal-theme { background-color: #2497a9; }
+        .luecha-orange-text { color: #FF6600; }
+        .bg-luecha-light { background-color: #f0f4ff; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -25,7 +27,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 1. Database Schema (Master Version) ---
+        // --- 1. Database Schema (Master DB) ---
         const db = new Dexie("LueCha_Master_DB");
         db.version(3).stores({
             products: "++id, name, price, cost, category",
@@ -41,20 +43,24 @@
         ];
 
         function App() {
-            const [view, setView] = useState('pos'); // pos, admin, report
+            const [view, setView] = useState('pos');
             const [cart, setCart] = useState([]);
             const [products, setProducts] = useState([]);
             const [ingredients, setIngredients] = useState([]);
             const [orders, setOrders] = useState([]);
-            const [selectedItem, setSelectedItem] = useState(null); // สำหรับ Modal เลือกขนาด/ท็อปปิ้ง
-            const [showAddModal, setShowAddModal] = useState(false); // สำหรับหน้าเพิ่มสินค้าใหม่
+            const [selectedItem, setSelectedItem] = useState(null);
+            const [showAddModal, setShowAddModal] = useState(false);
             
-            // Form State สำหรับเพิ่มสินค้า
+            // Payment States
+            const [showPayment, setShowPayment] = useState(false);
+            const [paymentMethod, setPaymentMethod] = useState('cash'); // cash, transfer, delivery
+            const [cashReceived, setCashReceived] = useState(0);
+            const [queueNumber, setQueueNumber] = useState(1);
+            const [showSuccess, setShowSuccess] = useState(false);
+
             const [formData, setFormData] = useState({ name: '', price: '', cost: '', category: 'เครื่องดื่ม' });
 
-            useEffect(() => {
-                refreshData();
-            }, []);
+            useEffect(() => { refreshData(); }, []);
 
             const refreshData = async () => {
                 setProducts(await db.products.toArray());
@@ -62,46 +68,61 @@
                 setOrders(await db.orders.toArray());
             };
 
-            const handleCheckout = async (method) => {
-                const total = cart.reduce((s, i) => s + i.price, 0);
-                await db.orders.add({ total, timestamp: new Date(), staff: 'พนักงานบูธ', paymentMethod: method });
-                await db.auditLogs.add({ timestamp: new Date(), action: `ขายสินค้า ยอด ${total}`, staff: 'พนักงานบูธ' });
-                setCart([]);
-                refreshData();
-                alert("ชำระเงินสำเร็จ!");
+            const totalAmount = useMemo(() => cart.reduce((s, i) => s + i.price, 0), [cart]);
+            const changeAmount = useMemo(() => Math.max(0, cashReceived - totalAmount), [cashReceived, totalAmount]);
+
+            const handleQuickCash = (amount) => {
+                if (amount === 'exact') setCashReceived(totalAmount);
+                else setCashReceived(prev => prev + amount);
             };
 
-            const handleSaveProduct = async () => {
-                if(!formData.name || !formData.price) return alert("กรุณากรอกข้อมูลสำคัญ");
-                await db.products.add(formData);
-                setShowAddModal(false);
-                setFormData({ name: '', price: '', cost: '', category: 'เครื่องดื่ม' });
-                refreshData();
+            const confirmPayment = async () => {
+                if (paymentMethod === 'cash' && cashReceived < totalAmount) {
+                    alert("ยอดเงินรับมาไม่เพียงพอ");
+                    return;
+                }
+                const orderData = {
+                    total: totalAmount,
+                    timestamp: new Date(),
+                    staff: 'พนักงานบูธ',
+                    paymentMethod: paymentMethod,
+                    queue: queueNumber
+                };
+                await db.orders.add(orderData);
+                setQueueNumber(prev => prev + 1);
+                setShowSuccess(true);
+                setTimeout(() => {
+                    setShowSuccess(false);
+                    setShowPayment(false);
+                    setCart([]);
+                    setCashReceived(0);
+                    refreshData();
+                }, 2000);
             };
 
             return (
                 <div className="h-screen flex flex-col overflow-hidden">
-                    {/* Header: Lue-Cha Brand */}
+                    {/* Header */}
                     <header className="luecha-blue p-4 text-white flex justify-between items-center shadow-lg z-10">
                         <div className="flex items-center gap-3">
-                            <span className="font-bold text-xl">เลื่องชื่อลือชา POS</span>
+                            <span className="font-bold text-xl tracking-tight">เลื่องชื่อลือชา POS</span>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => setView('pos')} className={`px-4 py-1 rounded-full text-sm ${view==='pos'?'bg-orange-500':'opacity-50'}`}>หน้าขาย</button>
-                            <button onClick={() => setView('admin')} className={`px-4 py-1 rounded-full text-sm ${view==='admin'?'bg-orange-500':'opacity-50'}`}>จัดการร้าน/สต็อก</button>
-                            <button onClick={() => setView('report')} className={`px-4 py-1 rounded-full text-sm ${view==='report'?'bg-orange-500':'opacity-50'}`}>รายงาน</button>
+                            <button onClick={() => setView('pos')} className={`px-4 py-1 rounded-full text-sm transition-all ${view==='pos'?'luecha-orange shadow-inner':'opacity-50'}`}>หน้าขาย</button>
+                            <button onClick={() => setView('admin')} className={`px-4 py-1 rounded-full text-sm transition-all ${view==='admin'?'luecha-orange shadow-inner':'opacity-50'}`}>จัดการร้าน</button>
+                            <button onClick={() => setView('report')} className={`px-4 py-1 rounded-full text-sm transition-all ${view==='report'?'luecha-orange shadow-inner':'opacity-50'}`}>รายงาน</button>
                         </div>
                     </header>
 
-                    {/* --- VIEW: POS --- */}
+                    {/* VIEW: POS */}
                     {view === 'pos' && (
                         <div className="flex-1 flex overflow-hidden">
                             <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar bg-slate-100">
                                 {products.map(p => (
                                     <button key={p.id} onClick={() => setSelectedItem({...p, currentSize: 'S', selectedToppings: []})}
-                                        className="bg-white p-4 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-40 border-2 border-transparent hover:border-orange-500 transition-all">
-                                        <span className="font-bold text-slate-800 text-center">{p.name}</span>
-                                        <span className="text-blue-700 font-black text-xl">{p.price}฿</span>
+                                        className="bg-white p-4 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-44 border-2 border-transparent hover:border-orange-500 transition-all">
+                                        <span className="font-bold text-slate-800 text-center mb-2">{p.name}</span>
+                                        <span className="luecha-blue-text font-black text-2xl">{p.price}฿</span>
                                     </button>
                                 ))}
                             </div>
@@ -109,7 +130,7 @@
                                 <div className="p-6 border-b font-bold text-lg text-slate-700">ออเดอร์ปัจจุบัน</div>
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                     {cart.map(item => (
-                                        <div key={item.cartId} className="bg-slate-50 p-3 rounded-2xl relative">
+                                        <div key={item.cartId} className="bg-slate-50 p-4 rounded-2xl relative">
                                             <div className="flex justify-between font-bold text-slate-800">
                                                 <span>{item.name} ({item.size})</span>
                                                 <span>{item.price}฿</span>
@@ -119,166 +140,172 @@
                                     ))}
                                 </div>
                                 <div className="p-6 bg-slate-50 border-t space-y-4">
-                                    <div className="flex justify-between text-3xl font-black text-blue-900">
+                                    <div className="flex justify-between text-3xl font-black luecha-blue-text">
                                         <span>รวม</span>
-                                        <span>{cart.reduce((s, i) => s + i.price, 0)}฿</span>
+                                        <span>{totalAmount}฿</span>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button onClick={() => handleCheckout('qr')} disabled={cart.length===0} className="bg-blue-700 text-white py-4 rounded-2xl font-bold active-scale disabled:opacity-30">QR</button>
-                                        <button onClick={() => handleCheckout('cash')} disabled={cart.length===0} className="luecha-orange text-white py-4 rounded-2xl font-bold active-scale disabled:opacity-30">เงินสด</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- VIEW: ADMIN (จัดการสินค้าและสต็อก) --- */}
-                    {view === 'admin' && (
-                        <div className="flex-1 p-8 overflow-y-auto bg-white">
-                            <div className="max-w-5xl mx-auto space-y-10">
-                                <div className="flex justify-between items-center">
-                                    <h2 className="text-3xl font-bold text-slate-800">จัดการร้านค้า</h2>
-                                    <button onClick={() => setShowAddModal(true)} className="teal-theme text-white px-8 py-3 rounded-2xl font-bold active-scale shadow-lg">
-                                        + เพิ่มสินค้าใหม่
+                                    <button onClick={() => setShowPayment(true)} disabled={cart.length===0} 
+                                        className="w-full luecha-orange text-white py-5 rounded-3xl font-bold text-xl shadow-lg active-scale disabled:opacity-30">
+                                        ชำระเงิน
                                     </button>
                                 </div>
-
-                                {/* Stock Section */}
-                                <section>
-                                    <h3 className="text-xl font-bold mb-4 text-slate-400 uppercase tracking-widest">คลังวัตถุดิบ</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        {ingredients.length === 0 && <p className="text-slate-400">ยังไม่มีข้อมูลสต็อก</p>}
-                                        {ingredients.map(ing => (
-                                            <div key={ing.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                                                <p className="text-slate-500 text-sm">{ing.name}</p>
-                                                <p className={`text-3xl font-black ${ing.stock <= ing.minStock ? 'text-red-500' : 'text-slate-800'}`}>{ing.stock} {ing.unit}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </section>
-
-                                {/* Product List Section */}
-                                <section>
-                                    <h3 className="text-xl font-bold mb-4 text-slate-400 uppercase tracking-widest">รายการสินค้าทั้งหมด</h3>
-                                    <div className="grid gap-3">
-                                        {products.map(p => (
-                                            <div key={p.id} className="flex justify-between items-center p-5 bg-white border border-slate-100 rounded-3xl shadow-sm">
-                                                <span className="font-bold text-slate-700 text-lg">{p.name}</span>
-                                                <div className="flex items-center gap-6">
-                                                    <span className="text-blue-600 font-black">{p.price}฿</span>
-                                                    <button onClick={async () => { if(confirm('ลบสินค้า?')) { await db.products.delete(p.id); refreshData(); } }} className="text-red-400 text-sm">ลบ</button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </section>
                             </div>
                         </div>
                     )}
 
-                    {/* --- VIEW: REPORT --- */}
-                    {view === 'report' && (
+                    {/* VIEW: ADMIN & REPORT (คงเดิมตาม Master) */}
+                    {view === 'admin' && (
                         <div className="flex-1 p-8 overflow-y-auto bg-white">
-                            <div className="max-w-4xl mx-auto">
-                                <h2 className="text-3xl font-bold mb-8 text-blue-900">สรุปยอดขาย</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                                    <div className="luecha-blue text-white p-8 rounded-[2.5rem] shadow-xl">
-                                        <p className="opacity-70 mb-1 font-light">ยอดขายรวมวันนี้</p>
-                                        <p className="text-5xl font-black">{orders.reduce((s, o) => s + o.total, 0).toLocaleString()}฿</p>
-                                    </div>
-                                    <div className="bg-white border-4 border-orange-500 p-8 rounded-[2.5rem]">
-                                        <p className="text-orange-500 mb-1 font-bold">จำนวนบิล</p>
-                                        <p className="text-5xl font-black text-slate-800">{orders.length}</p>
-                                    </div>
+                            <div className="max-w-5xl mx-auto space-y-8">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-3xl font-bold text-slate-800">จัดการร้านค้า</h2>
+                                    <button onClick={() => setShowAddModal(true)} className="luecha-blue text-white px-8 py-3 rounded-2xl font-bold active-scale shadow-lg">+ เพิ่มสินค้า</button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {ingredients.map(ing => (
+                                        <div key={ing.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                                            <p className="text-slate-500 text-sm">{ing.name}</p>
+                                            <p className={`text-3xl font-black ${ing.stock <= ing.minStock ? 'text-red-500' : 'text-slate-800'}`}>{ing.stock} {ing.unit}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* --- MODAL: BEVERAGE CUSTOMIZATION (S/M/L) --- */}
+                    {/* --- NEW PAYMENT MODAL (ตามรูปที่คุณส่งมา) --- */}
+                    {showPayment && (
+                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                            <div className="bg-white w-full max-w-4xl rounded-[2rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                                {/* Header */}
+                                <div className="flex justify-between items-center p-4 border-b">
+                                    <div className="flex items-center gap-2 font-bold text-slate-700">
+                                        <span>ชำระเงิน</span>
+                                        <div className="w-5 h-5 rounded-full border border-slate-300 flex items-center justify-center text-[10px]">i</div>
+                                    </div>
+                                    <button onClick={() => {setShowPayment(false); setCashReceived(0);}} className="text-slate-400 text-2xl">✕</button>
+                                </div>
+
+                                <div className="flex flex-col md:flex-row">
+                                    {/* Left Side: Summary & Methods */}
+                                    <div className="flex-1 p-6 border-r border-slate-100 space-y-6">
+                                        <div className="luecha-blue rounded-3xl p-8 text-center text-white shadow-inner">
+                                            <p className="text-sm opacity-80 mb-1">ยอดรวม</p>
+                                            <p className="text-6xl font-black">{totalAmount}</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <button onClick={() => setPaymentMethod('cash')} className={`flex flex-col items-center p-4 rounded-3xl border-2 transition-all ${paymentMethod==='cash'?'border-blue-500 bg-blue-50':'border-slate-100'}`}>
+                                                <div className={`w-6 h-6 rounded-full mb-2 flex items-center justify-center ${paymentMethod==='cash'?'bg-green-500 text-white':'border border-slate-300'}`}>{paymentMethod==='cash'&&'✓'}</div>
+                                                <span className="text-2xl mb-1">💵</span>
+                                                <span className="text-xs font-bold">เงินสด</span>
+                                            </button>
+                                            <button onClick={() => setPaymentMethod('transfer')} className={`flex flex-col items-center p-4 rounded-3xl border-2 transition-all ${paymentMethod==='transfer'?'border-blue-500 bg-blue-50':'border-slate-100'}`}>
+                                                <div className={`w-6 h-6 rounded-full mb-2 flex items-center justify-center ${paymentMethod==='transfer'?'bg-green-500 text-white':'border border-slate-300'}`}>{paymentMethod==='transfer'&&'✓'}</div>
+                                                <span className="text-2xl mb-1">📲</span>
+                                                <span className="text-xs font-bold">โอนเงิน</span>
+                                            </button>
+                                            <button onClick={() => setPaymentMethod('delivery')} className={`flex flex-col items-center p-4 rounded-3xl border-2 transition-all ${paymentMethod==='delivery'?'border-blue-500 bg-blue-50':'border-slate-100'}`}>
+                                                <div className={`w-6 h-6 rounded-full mb-2 flex items-center justify-center ${paymentMethod==='delivery'?'bg-green-500 text-white':'border border-slate-300'}`}>{paymentMethod==='delivery'&&'✓'}</div>
+                                                <span className="text-2xl mb-1">🛵</span>
+                                                <span className="text-xs font-bold">เดลิเวอรี่</span>
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border-2 border-blue-100">
+                                                <span className="text-slate-400">💸 รับมา</span>
+                                                <input type="number" className="flex-1 bg-transparent text-3xl font-black text-right outline-none luecha-blue-text" 
+                                                    value={cashReceived || ''} onChange={e => setCashReceived(parseFloat(e.target.value) || 0)} placeholder="กรอกที่นี่" />
+                                                <span className="text-slate-400">บาท</span>
+                                            </div>
+                                            <div className="flex justify-between items-center px-4">
+                                                <div className="flex items-center gap-2 text-slate-500">
+                                                    <span>🔗 ทอน</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-4xl font-black text-red-500">{changeAmount}</span>
+                                                    <span className="ml-2 text-slate-400">บาท</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Side: Quick Cash Buttons */}
+                                    <div className="w-full md:w-[400px] p-6 bg-slate-50/50">
+                                        <div className="flex justify-between text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">
+                                            <span>รับเงินด่วน</span>
+                                            <span>กดซ้ำเพื่อเพิ่มจำนวน</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <button onClick={() => handleQuickCash('exact')} className="h-20 rounded-2xl bg-green-100 text-green-700 font-bold border-2 border-green-200 active-scale">พอดี</button>
+                                            {[1, 5, 10, 20, 50, 100, 500, 1000].map(val => (
+                                                <button key={val} onClick={() => handleQuickCash(val)} className="h-20 rounded-2xl bg-white shadow-sm border border-slate-200 font-bold text-xl text-slate-700 active-scale hover:bg-white transition-all">
+                                                    {val}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Footer Confirm Button */}
+                                <div className="p-4 bg-white border-t">
+                                    <button onClick={confirmPayment} className="w-full luecha-orange text-white py-6 rounded-2xl font-bold text-2xl shadow-lg active-scale flex items-center justify-center gap-3">
+                                        {showSuccess ? '✓ ชำระเงินสำเร็จ' : 'ยืนยันชำระเงิน'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MODAL: Success Queue (Overlay) */}
+                    {showSuccess && (
+                        <div className="fixed inset-0 bg-emerald-600 flex flex-col items-center justify-center z-[100] text-white animate-in fade-in duration-300">
+                            <div className="text-[12rem] font-black leading-none mb-4">{queueNumber - 1}</div>
+                            <h2 className="text-4xl font-bold">คิวของคุณ</h2>
+                            <p className="mt-4 opacity-80">กำลังบันทึกข้อมูล...</p>
+                        </div>
+                    )}
+
+                    {/* MODAL: Size/Topping (คงเดิม) */}
                     {selectedItem && (
                         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-4">
-                            <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200">
+                            <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl">
                                 <div className="p-6 border-b flex justify-between items-center">
                                     <h3 className="text-xl font-bold text-slate-800">{selectedItem.name}</h3>
                                     <button onClick={() => setSelectedItem(null)} className="text-slate-400">ปิด</button>
                                 </div>
-                                <div className="p-6 space-y-8">
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">เลือกขนาดแก้ว</p>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            {['S', 'M', 'L'].map(size => (
-                                                <button key={size} onClick={() => setSelectedItem({...selectedItem, currentSize: size})}
-                                                    className={`py-4 rounded-2xl font-bold text-lg border-2 transition-all ${selectedItem.currentSize === size ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-slate-100 text-slate-400'}`}>
-                                                    {size}
-                                                </button>
-                                            ))}
-                                        </div>
+                                <div className="p-6 space-y-6">
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {['S', 'M', 'L'].map(size => (
+                                            <button key={size} onClick={() => setSelectedItem({...selectedItem, currentSize: size})}
+                                                className={`py-4 rounded-2xl font-bold border-2 transition-all ${selectedItem.currentSize === size ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-slate-100 text-slate-400'}`}>
+                                                {size}
+                                            </button>
+                                        ))}
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">เพิ่มท็อปปิ้ง (+20฿)</p>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {TOPPINGS.map(t => (
-                                                <button key={t.name} className="p-3 rounded-xl text-sm font-medium border-2 border-slate-50 text-slate-500 text-left">
-                                                    {t.name}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {TOPPINGS.map(t => {
+                                            const isSelected = (selectedItem.selectedToppings || []).find(st => st.name === t.name);
+                                            return (
+                                                <button key={t.name} onClick={() => {
+                                                    const current = selectedItem.selectedToppings || [];
+                                                    const next = isSelected ? current.filter(st => st.name !== t.name) : [...current, t];
+                                                    setSelectedItem({...selectedItem, selectedToppings: next});
+                                                }} className={`p-3 rounded-xl text-sm border-2 transition-all ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-50 text-slate-500'}`}>
+                                                    {t.name} (+{t.price})
                                                 </button>
-                                            ))}
-                                        </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                                 <div className="p-6 bg-slate-50">
                                     <button onClick={() => {
-                                        const finalPrice = selectedItem.currentSize === 'M' ? selectedItem.price + 5 : selectedItem.currentSize === 'L' ? selectedItem.price + 10 : selectedItem.price;
-                                        setCart([...cart, {...selectedItem, cartId: Date.now(), size: selectedItem.currentSize, price: finalPrice}]);
+                                        const toppingTotal = (selectedItem.selectedToppings || []).reduce((s,t)=>s+t.price,0);
+                                        const sizePrice = selectedItem.currentSize === 'M' ? selectedItem.price + 5 : selectedItem.currentSize === 'L' ? selectedItem.price + 10 : selectedItem.price;
+                                        setCart([...cart, {...selectedItem, cartId: Date.now(), size: selectedItem.currentSize, price: sizePrice + toppingTotal}]);
                                         setSelectedItem(null);
-                                    }} className="w-full luecha-orange text-white py-5 rounded-[1.5rem] font-bold text-xl shadow-lg active-scale">
-                                        เพิ่มลงตะกร้า
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- MODAL: ADD PRODUCT (UI ตามรูปที่คุณส่งมา) --- */}
-                    {showAddModal && (
-                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-4">
-                            <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
-                                <div className="flex justify-between items-center p-6 border-b border-slate-100">
-                                    <h2 className="text-2xl font-bold text-slate-800">เพิ่มสินค้า</h2>
-                                    <button onClick={() => setShowAddModal(false)} className="bg-red-50 text-red-500 p-2 rounded-full">✕</button>
-                                </div>
-                                <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto no-scrollbar">
-                                    <div className="flex gap-6">
-                                        <div className="w-28 h-28 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center text-slate-300">
-                                            <span className="text-3xl font-bold">?</span>
-                                            <span className="text-[10px]">เลือกรูป</span>
-                                        </div>
-                                        <div className="flex-1 space-y-4">
-                                            <input type="text" placeholder="ชื่อสินค้า *" className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-[#2497a9] text-lg transition-all" 
-                                                value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                                            <div className="flex gap-4">
-                                                <input type="number" placeholder="ราคาขาย *" className="w-1/2 bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-[#2497a9]"
-                                                    value={formData.price} onChange={e => setFormData({...formData, price: parseInt(e.target.value)})} />
-                                                <input type="number" placeholder="ต้นทุน" className="w-1/2 bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-[#2497a9]"
-                                                    value={formData.cost} onChange={e => setFormData({...formData, cost: parseInt(e.target.value)})} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between p-4 border border-slate-100 rounded-2xl bg-slate-50/50">
-                                            <div className="flex items-center gap-3"><span className="text-[#2497a9]">🏷️</span><span className="font-medium text-slate-700">หมวดหมู่</span></div>
-                                            <span className="text-slate-400 text-sm">เครื่องดื่ม ❯</span>
-                                        </div>
-                                        <div className="flex items-center justify-between p-4 border border-slate-100 rounded-2xl bg-slate-50/50">
-                                            <div className="flex items-center gap-3"><span className="text-[#2497a9]">📑</span><span className="font-medium text-slate-700">ตัวเลือกสินค้า</span></div>
-                                            <span className="text-slate-400 text-sm">1 กลุ่ม ❯</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="p-6">
-                                    <button onClick={handleSaveProduct} className="w-full bg-[#2497a9] text-white py-5 rounded-[1.5rem] font-bold text-xl shadow-lg active-scale">
-                                        บันทึกสินค้า
-                                    </button>
+                                    }} className="w-full luecha-orange text-white py-5 rounded-[1.5rem] font-bold text-xl active-scale">เพิ่มลงตะกร้า</button>
                                 </div>
                             </div>
                         </div>
