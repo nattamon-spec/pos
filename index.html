@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Master v1.8</title>
+    <title>Lue cha POS | Master v1.9</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -30,7 +30,7 @@
         // PART 1: DATABASE
         // ==========================================
         const db = new Dexie("LueCha_POS_ULTIMATE_V1");
-        db.version(3).stores({ // ขยับเวอร์ชั่นเพื่อรองรับ isRequired
+        db.version(3).stores({
             products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
             modifierGroups: "++id, name, selectionType, applyTo, targetIds, isRequired",
@@ -104,16 +104,11 @@
             const cartTotal = useMemo(() => cart.reduce((s, i) => s + Number(i.totalPrice), 0), [cart]);
             const changeAmount = useMemo(() => Math.max(0, Number(cashReceived) - cartTotal), [cashReceived, cartTotal]);
 
-            // ตรวจสอบว่าเลือกกลุ่มที่ "บังคับ" ครบหรือยัง
             const isSelectionValid = useMemo(() => {
                 if (!selectedItem) return false;
                 const relevantModifiers = modifiers.filter(m => m.applyTo === 'all' || m.targetIds.includes(selectedItem.id));
                 const requiredGroups = relevantModifiers.filter(m => m.isRequired);
-                
-                // เช็คว่าทุกกลุ่มที่ isRequired ต้องมีอย่างน้อย 1 topping ที่มี groupId ตรงกัน
-                return requiredGroups.every(group => 
-                    activeToppings.some(t => t.groupId === group.id)
-                );
+                return requiredGroups.every(group => activeToppings.some(t => t.groupId === group.id));
             }, [selectedItem, modifiers, activeToppings]);
 
             const handleAddToCart = () => {
@@ -139,8 +134,22 @@
                 await db.modifierGroups.put(data);
                 setShowModifierModal(false);
                 setEditingModifier(null);
-                setModForm({ name: '', selectionType: 'single', applyTo: 'all', targetIds: [], isRequired: false, options: [{ name: '', price: 0, cost: 0, isDefault: false }] });
                 refreshData();
+            };
+
+            // Category Management Logic
+            const handleAddCategory = async () => {
+                const name = prompt("ชื่อหมวดหมู่ใหม่:");
+                if (name) { await db.categories.add({ name }); refreshData(); }
+            };
+
+            const handleEditCategory = async (c) => {
+                const newName = prompt("แก้ไขชื่อหมวดหมู่:", c.name);
+                if (newName) { await db.categories.update(c.id, { name: newName }); refreshData(); }
+            };
+
+            const handleDeleteCategory = async (id) => {
+                if (confirm("ลบหมวดหมู่? (สินค้าในหมวดนี้จะไม่ถูกลบ)")) { await db.categories.delete(id); refreshData(); }
             };
 
             const handleConfirmPayment = async () => {
@@ -204,6 +213,7 @@
                         <div className="flex-1 flex flex-col bg-white overflow-hidden">
                             <div className="flex border-b bg-slate-50 px-8 pt-4 gap-6">
                                 <button onClick={() => setAdminTab('products')} className={`pb-3 font-bold border-b-4 ${adminTab==='products'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>สินค้า</button>
+                                <button onClick={() => setAdminTab('categories')} className={`pb-3 font-bold border-b-4 ${adminTab==='categories'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>หมวดหมู่</button>
                                 <button onClick={() => setAdminTab('modifiers')} className={`pb-3 font-bold border-b-4 ${adminTab==='modifiers'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>ตัวเลือก</button>
                             </div>
                             <div className="flex-1 p-8 overflow-y-auto">
@@ -228,6 +238,20 @@
                                             </div>
                                         </div>
                                     )}
+                                    {adminTab === 'categories' && (
+                                        <div className="space-y-4">
+                                            <button onClick={handleAddCategory} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มหมวดหมู่</button>
+                                            {categories.map(c => (
+                                                <div key={c.id} className="p-4 border rounded-2xl flex justify-between items-center">
+                                                    <span className="font-bold">{c.name}</span>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => handleEditCategory(c)} className="text-teal text-sm font-bold bg-teal-50 px-3 py-1 rounded-lg">แก้ไข</button>
+                                                        <button onClick={() => handleDeleteCategory(c.id)} className="text-red-400 text-sm">ลบ</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                     {adminTab === 'modifiers' && (
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
@@ -240,7 +264,7 @@
                                                         <span>{m.name} {m.isRequired && <span className="text-red-500 text-xs">(บังคับ)</span>}</span>
                                                         <div className="flex gap-2">
                                                             <button onClick={() => {setEditingModifier(m); setModForm(m); setShowModifierModal(true);}} className="text-teal text-sm font-bold bg-teal-50 px-3 py-1 rounded-lg">แก้ไข</button>
-                                                            <button onClick={async () => {if(confirm('ลบ?')) {await db.modifierGroups.delete(m.id); refreshData();}}} className="text-red-400 text-sm">ลบ</button>
+                                                            <button onClick={async () => {if(confirm('ลบกลุ่มตัวเลือก?')) {await db.modifierGroups.delete(m.id); refreshData();}}} className="text-red-400 text-sm">ลบ</button>
                                                         </div>
                                                     </div>
                                                     <div className="flex flex-wrap gap-2">
@@ -273,6 +297,10 @@
                         </div>
                     )}
 
+                    {/* ==========================================
+                        PART 6: MODALS
+                    ========================================== */}
+                    
                     {/* MODAL: IMAGE 5 (Ordering) */}
                     {selectedItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
@@ -370,8 +398,6 @@
                                         <input type="text" placeholder="เช่น ระดับความหวาน / ไซส์ / ท็อปปิ้ง" className="w-full border-b-2 border-slate-100 py-3 outline-none focus:border-teal-500 transition-all text-lg"
                                             value={modForm.name} onChange={e => setModForm({...modForm, name: e.target.value})} />
                                     </div>
-                                    
-                                    {/* บังคับเลือก Toggle */}
                                     <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl">
                                         <div>
                                             <p className="font-bold text-slate-700">บังคับเลือก</p>
@@ -382,7 +408,6 @@
                                             <div className={`w-6 h-6 bg-white rounded-full absolute top-1 transition-all ${modForm.isRequired ? 'left-7' : 'left-1'}`}></div>
                                         </button>
                                     </div>
-
                                     <div>
                                         <label className="text-xs font-bold text-slate-700 uppercase">ลูกค้าเลือกได้</label>
                                         <div className="flex p-1 bg-slate-100 rounded-2xl mt-2">
@@ -497,11 +522,18 @@
                                             </button>
                                             {openSection === 'category' && (
                                                 <div className="p-4 bg-slate-50 flex flex-wrap gap-2 border-t">
+                                                    <button onClick={handleAddCategory} className="border-2 border-dashed border-teal-500 text-teal-600 px-4 py-2 rounded-full text-sm font-bold active-scale">+ เพิ่มหมวด</button>
                                                     {categories.map(c => (
-                                                        <button key={c.id} onClick={() => setForm({...form, categoryId: c.id})}
-                                                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${form.categoryId===c.id?'btn-teal text-white':'bg-white text-slate-400 border'}`}>
-                                                            {c.name}
-                                                        </button>
+                                                        <div key={c.id} className="relative group">
+                                                            <button onClick={() => setForm({...form, categoryId: c.id})}
+                                                                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${form.categoryId===c.id?'btn-teal text-white':'bg-white text-slate-400 border'}`}>
+                                                                {c.name}
+                                                            </button>
+                                                            <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => handleEditCategory(c)} className="bg-blue-500 text-white w-5 h-5 rounded-full text-[10px] flex items-center justify-center">✎</button>
+                                                                <button onClick={() => handleDeleteCategory(c.id)} className="bg-red-500 text-white w-5 h-5 rounded-full text-[10px] flex items-center justify-center">✕</button>
+                                                            </div>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             )}
