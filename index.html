@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Master v1.9</title>
+    <title>Lue cha POS | Master Foundation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -27,10 +27,10 @@
         const { useState, useEffect, useMemo } = React;
 
         // ==========================================
-        // PART 1: DATABASE
+        // PART 1: DATABASE (ล็อคโครงสร้างถาวร)
         // ==========================================
-        const db = new Dexie("LueCha_POS_ULTIMATE_V1");
-        db.version(3).stores({
+        const db = new Dexie("LueCha_POS_Master_DB");
+        db.version(1).stores({
             products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
             modifierGroups: "++id, name, selectionType, applyTo, targetIds, isRequired",
@@ -49,6 +49,7 @@
             const [orders, setOrders] = useState([]);
             const [cart, setCart] = useState([]);
 
+            // Modals
             const [selectedItem, setSelectedItem] = useState(null); 
             const [showProductModal, setShowProductModal] = useState(false); 
             const [showModifierModal, setShowModifierModal] = useState(false); 
@@ -56,16 +57,20 @@
             const [editingModifier, setEditingModifier] = useState(null);
             const [showPayment, setShowPayment] = useState(false); 
 
+            // Selection (Image 5)
             const [qty, setQty] = useState(1);
             const [size, setSize] = useState('S');
             const [activeToppings, setActiveToppings] = useState([]);
 
+            // Forms
             const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: '' });
             const [modForm, setModForm] = useState({
                 name: '', selectionType: 'single', applyTo: 'all', targetIds: [], isRequired: false,
                 options: [{ name: '', price: 0, cost: 0, isDefault: false }]
             });
             const [openSection, setOpenSection] = useState('category');
+
+            // Payment
             const [cashReceived, setCashReceived] = useState(0);
             const [paymentMethod, setPaymentMethod] = useState('cash');
 
@@ -104,6 +109,7 @@
             const cartTotal = useMemo(() => cart.reduce((s, i) => s + Number(i.totalPrice), 0), [cart]);
             const changeAmount = useMemo(() => Math.max(0, Number(cashReceived) - cartTotal), [cashReceived, cartTotal]);
 
+            // ฟีเจอร์ "บังคับเลือก" (Required Validation)
             const isSelectionValid = useMemo(() => {
                 if (!selectedItem) return false;
                 const relevantModifiers = modifiers.filter(m => m.applyTo === 'all' || m.targetIds.includes(selectedItem.id));
@@ -134,22 +140,8 @@
                 await db.modifierGroups.put(data);
                 setShowModifierModal(false);
                 setEditingModifier(null);
+                setModForm({ name: '', selectionType: 'single', applyTo: 'all', targetIds: [], isRequired: false, options: [{ name: '', price: 0, cost: 0, isDefault: false }] });
                 refreshData();
-            };
-
-            // Category Management Logic
-            const handleAddCategory = async () => {
-                const name = prompt("ชื่อหมวดหมู่ใหม่:");
-                if (name) { await db.categories.add({ name }); refreshData(); }
-            };
-
-            const handleEditCategory = async (c) => {
-                const newName = prompt("แก้ไขชื่อหมวดหมู่:", c.name);
-                if (newName) { await db.categories.update(c.id, { name: newName }); refreshData(); }
-            };
-
-            const handleDeleteCategory = async (id) => {
-                if (confirm("ลบหมวดหมู่? (สินค้าในหมวดนี้จะไม่ถูกลบ)")) { await db.categories.delete(id); refreshData(); }
             };
 
             const handleConfirmPayment = async () => {
@@ -165,6 +157,7 @@
             // ==========================================
             return (
                 <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
+                    {/* Header */}
                     <header className="luecha-blue p-4 text-white flex justify-between items-center shadow-lg z-10">
                         <h1 className="font-bold text-xl">เลื่องชื่อลือชา POS</h1>
                         <div className="flex gap-2">
@@ -174,6 +167,7 @@
                         </div>
                     </header>
 
+                    {/* VIEW: POS */}
                     {view === 'pos' && (
                         <div className="flex-1 flex overflow-hidden">
                             <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar bg-slate-100">
@@ -209,6 +203,7 @@
                         </div>
                     )}
 
+                    {/* VIEW: ADMIN */}
                     {view === 'admin' && (
                         <div className="flex-1 flex flex-col bg-white overflow-hidden">
                             <div className="flex border-b bg-slate-50 px-8 pt-4 gap-6">
@@ -240,13 +235,13 @@
                                     )}
                                     {adminTab === 'categories' && (
                                         <div className="space-y-4">
-                                            <button onClick={handleAddCategory} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มหมวดหมู่</button>
+                                            <button onClick={async () => {const name = prompt("ชื่อหมวดหมู่:"); if(name) {await db.categories.add({name}); refreshData();}}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มหมวดหมู่</button>
                                             {categories.map(c => (
                                                 <div key={c.id} className="p-4 border rounded-2xl flex justify-between items-center">
                                                     <span className="font-bold">{c.name}</span>
                                                     <div className="flex gap-2">
-                                                        <button onClick={() => handleEditCategory(c)} className="text-teal text-sm font-bold bg-teal-50 px-3 py-1 rounded-lg">แก้ไข</button>
-                                                        <button onClick={() => handleDeleteCategory(c.id)} className="text-red-400 text-sm">ลบ</button>
+                                                        <button onClick={async () => {const n = prompt("ชื่อใหม่:", c.name); if(n) {await db.categories.update(c.id, {name:n}); refreshData();}}} className="text-teal text-sm font-bold bg-teal-50 px-3 py-1 rounded-lg">แก้ไข</button>
+                                                        <button onClick={async () => {if(confirm('ลบ?')) {await db.categories.delete(c.id); refreshData();}}} className="text-red-400 text-sm">ลบ</button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -264,7 +259,7 @@
                                                         <span>{m.name} {m.isRequired && <span className="text-red-500 text-xs">(บังคับ)</span>}</span>
                                                         <div className="flex gap-2">
                                                             <button onClick={() => {setEditingModifier(m); setModForm(m); setShowModifierModal(true);}} className="text-teal text-sm font-bold bg-teal-50 px-3 py-1 rounded-lg">แก้ไข</button>
-                                                            <button onClick={async () => {if(confirm('ลบกลุ่มตัวเลือก?')) {await db.modifierGroups.delete(m.id); refreshData();}}} className="text-red-400 text-sm">ลบ</button>
+                                                            <button onClick={async () => {if(confirm('ลบ?')) {await db.modifierGroups.delete(m.id); refreshData();}}} className="text-red-400 text-sm">ลบ</button>
                                                         </div>
                                                     </div>
                                                     <div className="flex flex-wrap gap-2">
@@ -395,7 +390,7 @@
                                 <div className="p-6 space-y-6 overflow-y-auto no-scrollbar">
                                     <div>
                                         <label className="text-xs font-bold text-slate-700 uppercase">ชื่อกลุ่มตัวเลือก *</label>
-                                        <input type="text" placeholder="เช่น ระดับความหวาน / ไซส์ / ท็อปปิ้ง" className="w-full border-b-2 border-slate-100 py-3 outline-none focus:border-teal-500 transition-all text-lg"
+                                        <input type="text" placeholder="เช่น ระดับความหวาน" className="w-full border-b-2 border-slate-100 py-3 outline-none focus:border-teal-500 transition-all text-lg"
                                             value={modForm.name} onChange={e => setModForm({...modForm, name: e.target.value})} />
                                     </div>
                                     <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl">
@@ -437,48 +432,30 @@
                                         )}
                                     </div>
                                     <div>
-                                        <div className="flex justify-between items-center mb-4">
-                                            <label className="text-xs font-bold text-slate-700 uppercase">ตัวเลือกย่อย *</label>
-                                            <div className="flex gap-8 text-[10px] text-slate-400 font-bold uppercase pr-12">
-                                                <span>ราคา +/-</span>
-                                                <span>ต้นทุน</span>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-3">
+                                        <label className="text-xs font-bold text-slate-700 uppercase">ตัวเลือกย่อย *</label>
+                                        <div className="space-y-3 mt-2">
                                             {modForm.options.map((opt, idx) => (
-                                                <div key={idx} className="flex items-center gap-2 group">
-                                                    <span className="text-slate-300 cursor-grab">⠿</span>
-                                                    <input type="text" placeholder="เช่น หวานน้อย" className="flex-1 bg-slate-50 p-3 rounded-2xl outline-none text-sm border border-transparent focus:border-teal-500"
+                                                <div key={idx} className="flex items-center gap-2">
+                                                    <input type="text" placeholder="ชื่อ" className="flex-1 bg-slate-50 p-3 rounded-2xl outline-none text-sm"
                                                         value={opt.name} onChange={e => {
                                                             const newOpts = [...modForm.options];
                                                             newOpts[idx].name = e.target.value;
                                                             setModForm({...modForm, options: newOpts});
                                                         }} />
-                                                    <input type="number" className="w-16 bg-slate-50 p-3 rounded-2xl outline-none text-sm text-center border border-transparent focus:border-teal-500"
+                                                    <input type="number" placeholder="ราคา" className="w-20 bg-slate-50 p-3 rounded-2xl outline-none text-sm text-center"
                                                         value={opt.price} onChange={e => {
                                                             const newOpts = [...modForm.options];
                                                             newOpts[idx].price = Number(e.target.value);
                                                             setModForm({...modForm, options: newOpts});
                                                         }} />
-                                                    <input type="number" className="w-16 bg-slate-50 p-3 rounded-2xl outline-none text-sm text-center border border-transparent focus:border-teal-500"
-                                                        value={opt.cost} onChange={e => {
-                                                            const newOpts = [...modForm.options];
-                                                            newOpts[idx].cost = Number(e.target.value);
-                                                            setModForm({...modForm, options: newOpts});
-                                                        }} />
-                                                    <button onClick={() => {
-                                                        const newOpts = [...modForm.options];
-                                                        newOpts[idx].isDefault = !newOpts[idx].isDefault;
-                                                        setModForm({...modForm, options: newOpts});
-                                                    }} className={`text-xl ${opt.isDefault ? 'text-yellow-400' : 'text-slate-200'}`}>★</button>
                                                     <button onClick={() => {
                                                         const newOpts = modForm.options.filter((_, i) => i !== idx);
                                                         setModForm({...modForm, options: newOpts});
-                                                    }} className="text-slate-300 hover:text-red-500 transition-colors">🗑</button>
+                                                    }} className="text-red-400">🗑</button>
                                                 </div>
                                             ))}
                                             <button onClick={() => setModForm({...modForm, options: [...modForm.options, {name:'', price:0, cost:0, isDefault:false}]})}
-                                                className="w-full border-2 border-dashed border-teal-500 text-teal-600 py-3 rounded-2xl text-sm font-bold active-scale mt-2">+ เพิ่มตัวเลือก</button>
+                                                className="w-full border-2 border-dashed border-teal-500 text-teal-600 py-3 rounded-2xl text-sm font-bold active-scale">+ เพิ่มตัวเลือก</button>
                                         </div>
                                     </div>
                                 </div>
@@ -501,7 +478,6 @@
                                     <div className="flex gap-6">
                                         <div className="w-28 h-28 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center text-slate-300">
                                             <span className="text-3xl">?</span>
-                                            <span className="text-[10px]">เลือกรูป</span>
                                         </div>
                                         <div className="flex-1 space-y-4">
                                             <input type="text" placeholder="ชื่อสินค้า *" className="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-teal-500 transition-all"
@@ -522,18 +498,11 @@
                                             </button>
                                             {openSection === 'category' && (
                                                 <div className="p-4 bg-slate-50 flex flex-wrap gap-2 border-t">
-                                                    <button onClick={handleAddCategory} className="border-2 border-dashed border-teal-500 text-teal-600 px-4 py-2 rounded-full text-sm font-bold active-scale">+ เพิ่มหมวด</button>
                                                     {categories.map(c => (
-                                                        <div key={c.id} className="relative group">
-                                                            <button onClick={() => setForm({...form, categoryId: c.id})}
-                                                                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${form.categoryId===c.id?'btn-teal text-white':'bg-white text-slate-400 border'}`}>
-                                                                {c.name}
-                                                            </button>
-                                                            <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button onClick={() => handleEditCategory(c)} className="bg-blue-500 text-white w-5 h-5 rounded-full text-[10px] flex items-center justify-center">✎</button>
-                                                                <button onClick={() => handleDeleteCategory(c.id)} className="bg-red-500 text-white w-5 h-5 rounded-full text-[10px] flex items-center justify-center">✕</button>
-                                                            </div>
-                                                        </div>
+                                                        <button key={c.id} onClick={() => setForm({...form, categoryId: c.id})}
+                                                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${form.categoryId===c.id?'btn-teal text-white':'bg-white text-slate-400 border'}`}>
+                                                            {c.name}
+                                                        </button>
                                                     ))}
                                                 </div>
                                             )}
