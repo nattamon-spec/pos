@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Stable Foundation v1.3</title>
+    <title>Lue cha POS | Master v1.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -25,39 +25,44 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-       // ==========================================
-        // PART 1: DATABASE (โครงสร้างฐานข้อมูล)
+        // ==========================================
+        // PART 1: DATABASE (ล็อคโครงสร้าง Version 2)
         // ==========================================
         const db = new Dexie("LueCha_POS_Stable_DB");
-        // ขยับเป็น Version 2 เพื่อเพิ่ม modifierGroups
         db.version(2).stores({
             products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
-            modifierGroups: "++id, name, options", // เก็บกลุ่มตัวเลือก เช่น {name: "ท็อปปิ้ง", options: [{name: "มุก", price: 10}]}
+            modifierGroups: "++id, name, options",
             orders: "++id, total, timestamp, paymentMethod, items"
         });
+
+        function App() {
             // ==========================================
-            // PART 2: STATES (ตัวแปรควบคุมระบบ)
+            // PART 2: STATES
             // ==========================================
             const [view, setView] = useState('pos');
             const [products, setProducts] = useState([]);
             const [categories, setCategories] = useState([]);
+            const [modifiers, setModifiers] = useState([]);
             const [orders, setOrders] = useState([]);
             const [cart, setCart] = useState([]);
-            const [modifiers, setModifiers] = useState([]); // เก็บรายการกลุ่มตัวเลือกทั้งหมด
 
+            // Modals
             const [selectedItem, setSelectedItem] = useState(null); 
             const [showProductModal, setShowProductModal] = useState(false); 
             const [editingProduct, setEditingProduct] = useState(null);
             const [showPayment, setShowPayment] = useState(false); 
 
+            // Selection (Image 5)
             const [qty, setQty] = useState(1);
             const [size, setSize] = useState('S');
-            const [toppings, setToppings] = useState([]);
+            const [activeToppings, setActiveToppings] = useState([]);
 
+            // Form (Image 7)
             const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: 1 });
             const [openSection, setOpenSection] = useState('category');
 
+            // Payment (Image 4)
             const [cashReceived, setCashReceived] = useState(0);
             const [paymentMethod, setPaymentMethod] = useState('cash');
 
@@ -75,26 +80,27 @@
             const refreshData = async () => {
                 setProducts(await db.products.toArray());
                 setCategories(await db.categories.toArray());
+                setModifiers(await db.modifierGroups.toArray());
                 setOrders(await db.orders.toArray());
             };
 
             // ==========================================
-            // PART 4: LOGIC (ระบบคำนวณและฟังก์ชัน)
+            // PART 4: LOGIC
             // ==========================================
             const currentItemTotal = useMemo(() => {
                 if (!selectedItem) return 0;
                 let base = Number(selectedItem.price);
                 if (size === 'M') base += 5;
                 if (size === 'L') base += 10;
-                const toppingSum = toppings.reduce((s, t) => s + Number(t.price), 0);
+                const toppingSum = activeToppings.reduce((s, t) => s + Number(t.price), 0);
                 return (base + toppingSum) * Number(qty);
-            }, [selectedItem, size, toppings, qty]);
+            }, [selectedItem, size, activeToppings, qty]);
 
             const cartTotal = useMemo(() => cart.reduce((s, i) => s + Number(i.totalPrice), 0), [cart]);
             const changeAmount = useMemo(() => Math.max(0, Number(cashReceived) - cartTotal), [cashReceived, cartTotal]);
 
             const handleAddToCart = () => {
-                const item = { ...selectedItem, cartId: Date.now(), qty, size, toppings, totalPrice: currentItemTotal };
+                const item = { ...selectedItem, cartId: Date.now(), qty, size, toppings: activeToppings, totalPrice: currentItemTotal };
                 setCart([...cart, item]);
                 setSelectedItem(null);
             };
@@ -111,57 +117,40 @@
             };
 
             const handleAddCategory = async () => {
-                const name = prompt("กรุณาระบุชื่อหมวดหมู่ใหม่:");
-                if (name) {
-                    await db.categories.add({ name: name });
-                    refreshData();
-                }
+                const name = prompt("ชื่อหมวดหมู่ใหม่:");
+                if (name) { await db.categories.add({ name }); refreshData(); }
             };
 
             const handleDeleteCategory = async (id) => {
-                if (confirm("ต้องการลบหมวดหมู่นี้ใช่หรือไม่?")) {
-                    await db.categories.delete(id);
-                    refreshData();
-                }
+                if (confirm("ลบหมวดหมู่?")) { await db.categories.delete(id); refreshData(); }
             };
 
-            const handleConfirmPayment = async () => {
-                await db.orders.add({ total: cartTotal, timestamp: new Date(), paymentMethod, items: cart });
-                setCart([]); setShowPayment(false); setCashReceived(0);
-                refreshData();
-                alert("ชำระเงินสำเร็จ!");
-            };
-// ฟังก์ชันเพิ่มกลุ่มตัวเลือกใหม่
             const handleAddModifierGroup = async () => {
-                const name = prompt("ชื่อกลุ่มตัวเลือก (เช่น ท็อปปิ้ง หรือ ระดับความหวาน):");
+                const name = prompt("ชื่อกลุ่มตัวเลือก (เช่น ท็อปปิ้ง):");
                 if (!name) return;
-                const optionsStr = prompt("ระบุตัวเลือกและราคา (รูปแบบ: ชื่อ:ราคา, ชื่อ:ราคา) \nตัวอย่าง: ไข่มุก:10, วิปครีม:20");
+                const optionsStr = prompt("ระบุตัวเลือก (รูปแบบ ชื่อ:ราคา, ชื่อ:ราคา):");
                 if (optionsStr) {
-                    const options = optionsStr.split(',').map(item => {
-                        const [optName, price] = item.split(':');
-                        return { name: optName.trim(), price: Number(price.trim() || 0) };
+                    const options = optionsStr.split(',').map(i => {
+                        const [n, p] = i.split(':');
+                        return { name: n.trim(), price: Number(p.trim() || 0) };
                     });
                     await db.modifierGroups.add({ name, options });
                     refreshData();
                 }
             };
 
-            // ฟังก์ชันลบกลุ่มตัวเลือก
             const handleDeleteModifierGroup = async (id) => {
-                if (confirm("ต้องการลบกลุ่มตัวเลือกนี้ใช่หรือไม่?")) {
-                    await db.modifierGroups.delete(id);
-                    refreshData();
-                }
+                if (confirm("ลบกลุ่มตัวเลือก?")) { await db.modifierGroups.delete(id); refreshData(); }
             };
 
-            // อัปเดตฟังก์ชัน refreshData ให้ดึงข้อมูล Modifiers ด้วย
-            // (ให้หาฟังก์ชัน refreshData เดิมแล้ววางทับด้วยอันนี้)
-            const refreshData = async () => {
-                setProducts(await db.products.toArray());
-                setCategories(await db.categories.toArray());
-                setOrders(await db.orders.toArray());
-                setModifiers(await db.modifierGroups.toArray()); // ดึงข้อมูลตัวเลือก
+            const handleConfirmPayment = async () => {
+                if (paymentMethod === 'cash' && Number(cashReceived) < cartTotal) return alert("เงินไม่พอ");
+                await db.orders.add({ total: cartTotal, timestamp: new Date(), paymentMethod, items: cart });
+                setCart([]); setShowPayment(false); setCashReceived(0);
+                refreshData();
+                alert("ชำระเงินสำเร็จ!");
             };
+
             // ==========================================
             // PART 5: UI RENDER
             // ==========================================
@@ -180,7 +169,7 @@
                         <div className="flex-1 flex overflow-hidden">
                             <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar bg-slate-100">
                                 {products.map(p => (
-                                    <button key={p.id} onClick={() => {setSelectedItem(p); setQty(1); setSize('S'); setToppings([]);}}
+                                    <button key={p.id} onClick={() => {setSelectedItem(p); setQty(1); setSize('S'); setActiveToppings([]);}}
                                         className="bg-white p-5 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-44 border-2 border-transparent hover:border-orange-500 transition-all">
                                         <span className="font-bold text-slate-800 text-lg">{p.name}</span>
                                         <span className="text-blue-700 font-black text-2xl">{p.price}฿</span>
@@ -261,7 +250,7 @@
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
                                 <div className="p-4 border-b flex justify-between items-center">
-                                    <span className="font-bold text-slate-700 text-lg">ยืนยันจำนวนสินค้า</span>
+                                    <span className="font-bold text-slate-700">ยืนยันจำนวนสินค้า</span>
                                     <button onClick={() => setSelectedItem(null)} className="text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
                                 </div>
                                 <div className="flex flex-col md:flex-row">
@@ -299,19 +288,26 @@
                                             </div>
                                         </div>
                                         <div>
-                                            <p className="font-bold mb-4">ท็อปปิ้ง <span className="bg-slate-200 text-slate-500 text-[10px] px-2 py-0.5 rounded-full font-normal">ไม่บังคับ</span></p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {[{name:'วิปครีม',price:20},{name:'ชีสขูด',price:20}].map(t => {
-                                                    const isSel = toppings.find(x => x.name === t.name);
-                                                    return (
-                                                        <button key={t.name} onClick={() => {
-                                                            const next = isSel ? toppings.filter(x => x.name !== t.name) : [...toppings, t];
-                                                            setToppings(next);
-                                                        }} className={`px-4 py-2 rounded-full border-2 text-sm transition-all ${isSel?'border-teal-500 bg-teal-50 text-teal-600 font-bold':'bg-white border-slate-100 text-slate-400'}`}>
-                                                            {t.name} +{t.price}
-                                                        </button>
-                                                    );
-                                                })}
+                                            <p className="font-bold mb-4 text-slate-700">ตัวเลือกเพิ่มเติม</p>
+                                            <div className="space-y-4">
+                                                {modifiers.map(group => (
+                                                    <div key={group.id}>
+                                                        <p className="text-xs font-bold text-slate-400 mb-2 uppercase">{group.name}</p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {group.options.map((opt, idx) => {
+                                                                const isSel = activeToppings.find(x => x.name === opt.name && x.groupId === group.id);
+                                                                return (
+                                                                    <button key={idx} onClick={() => {
+                                                                        const next = isSel ? activeToppings.filter(x => !(x.name === opt.name && x.groupId === group.id)) : [...activeToppings, {...opt, groupId: group.id}];
+                                                                        setActiveToppings(next);
+                                                                    }} className={`px-4 py-2 rounded-full border-2 text-sm transition-all ${isSel?'border-teal-500 bg-teal-50 text-teal-600 font-bold':'bg-white border-slate-100 text-slate-400'}`}>
+                                                                        {opt.name} {opt.price > 0 ? `+${opt.price}` : ''}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>
@@ -323,7 +319,7 @@
                         </div>
                     )}
 
-                   {/* MODAL: IMAGE 7 (เพิ่ม/แก้ไขสินค้า) */}
+                    {/* MODAL: IMAGE 7 (เพิ่ม/แก้ไขสินค้า) */}
                     {showProductModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
@@ -348,9 +344,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    
                                     <div className="space-y-3">
-                                        {/* ส่วนที่ 1: หมวดหมู่ */}
                                         <div className="border rounded-2xl overflow-hidden">
                                             <button onClick={() => setOpenSection(openSection==='category'?'':'category')} className="w-full p-4 flex justify-between items-center bg-white">
                                                 <div className="flex items-center gap-3 text-teal-600 font-bold">🏷️ หมวดหมู่</div>
@@ -371,41 +365,27 @@
                                                 </div>
                                             )}
                                         </div>
-
-                                        {/* ส่วนที่ 2: ตัวเลือกสินค้า (Modifiers) - เพิ่มใหม่ */}
                                         <div className="border rounded-2xl overflow-hidden">
                                             <button onClick={() => setOpenSection(openSection==='modifiers'?'':'modifiers')} className="w-full p-4 flex justify-between items-center bg-white">
-                                                <div className="flex items-center gap-3 text-teal-600 font-bold">
-                                                    📑 ตัวเลือกสินค้า 
-                                                    <span className="text-xs font-normal text-slate-400 ml-2">· {modifiers.length} กลุ่ม</span>
-                                                </div>
+                                                <div className="flex items-center gap-3 text-teal-600 font-bold">📑 ตัวเลือกสินค้า <span className="text-xs font-normal text-slate-400 ml-2">· {modifiers.length} กลุ่ม</span></div>
                                                 <span>{openSection==='modifiers'?'▲':'▼'}</span>
                                             </button>
                                             {openSection === 'modifiers' && (
                                                 <div className="p-4 bg-slate-50 space-y-3 border-t">
                                                     {modifiers.map(m => (
                                                         <div key={m.id} className="bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm">
-                                                            <div>
-                                                                <p className="font-bold text-slate-700">{m.name}</p>
-                                                                <p className="text-[10px] text-slate-400">
-                                                                    {m.options.map(opt => `${opt.name} (+${opt.price})`).join(', ')}
-                                                                </p>
-                                                            </div>
-                                                            <button onClick={() => handleDeleteModifierGroup(m.id)} className="text-red-400 text-xs hover:bg-red-50 px-2 py-1 rounded-lg">ลบ</button>
+                                                            <div><p className="font-bold text-slate-700">{m.name}</p><p className="text-[10px] text-slate-400">{m.options.map(opt => `${opt.name} (+${opt.price})`).join(', ')}</p></div>
+                                                            <button onClick={() => handleDeleteModifierGroup(m.id)} className="text-red-400 text-xs">ลบ</button>
                                                         </div>
                                                     ))}
-                                                    <button onClick={handleAddModifierGroup} className="w-full border-2 border-dashed border-teal-500 text-teal-600 py-3 rounded-2xl text-sm font-bold active-scale">
-                                                        + เพิ่มกลุ่มตัวเลือก
-                                                    </button>
+                                                    <button onClick={handleAddModifierGroup} className="w-full border-2 border-dashed border-teal-500 text-teal-600 py-3 rounded-2xl text-sm font-bold active-scale">+ เพิ่มกลุ่มตัวเลือก</button>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="p-6">
-                                    <button onClick={handleSaveProduct} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale flex items-center justify-center gap-3 shadow-lg">
-                                        💾 บันทึก
-                                    </button>
+                                    <button onClick={handleSaveProduct} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale flex items-center justify-center gap-3 shadow-lg">💾 บันทึก</button>
                                 </div>
                             </div>
                         </div>
