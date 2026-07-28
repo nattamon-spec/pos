@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Master v1.6</title>
+    <title>Lue cha POS | Master v1.7</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -18,7 +18,6 @@
         .luecha-orange { background-color: #FF6600; }
         .btn-teal { background-color: #2497a9; }
         .text-teal { color: #2497a9; }
-        .bg-teal-light { background-color: #e6f4f6; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -53,8 +52,9 @@
             // Modals
             const [selectedItem, setSelectedItem] = useState(null); 
             const [showProductModal, setShowProductModal] = useState(false); 
-            const [showModifierModal, setShowModifierModal] = useState(false); // Image 8
+            const [showModifierModal, setShowModifierModal] = useState(false); 
             const [editingProduct, setEditingProduct] = useState(null);
+            const [editingModifier, setEditingModifier] = useState(null);
             const [showPayment, setShowPayment] = useState(false); 
 
             // Selection (Image 5)
@@ -62,17 +62,15 @@
             const [size, setSize] = useState('S');
             const [activeToppings, setActiveToppings] = useState([]);
 
-            // Form Modifier (Image 8 State)
+            // Form States
+            const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: '' });
             const [modForm, setModForm] = useState({
-                name: '',
-                selectionType: 'single', // single, multiple
-                applyTo: 'all', // all, products
-                targetIds: [],
+                name: '', selectionType: 'single', applyTo: 'all', targetIds: [],
                 options: [{ name: '', price: 0, cost: 0, isDefault: false }]
             });
-
-            const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: '' });
             const [openSection, setOpenSection] = useState('category');
+
+            // Payment
             const [cashReceived, setCashReceived] = useState(0);
             const [paymentMethod, setPaymentMethod] = useState('cash');
 
@@ -117,14 +115,7 @@
                 setSelectedItem(null);
             };
 
-            const handleSaveModifierGroup = async () => {
-                if(!modForm.name) return alert("กรุณาระบุชื่อกลุ่มตัวเลือก");
-                await db.modifierGroups.add(modForm);
-                setShowModifierModal(false);
-                setModForm({ name: '', selectionType: 'single', applyTo: 'all', targetIds: [], options: [{ name: '', price: 0, cost: 0, isDefault: false }] });
-                refreshData();
-            };
-
+            // Product Save/Edit
             const handleSaveProduct = async () => {
                 if(!form.name || !form.price) return alert("กรุณากรอกชื่อและราคา");
                 const data = { ...form, price: Number(form.price), cost: Number(form.cost || 0), categoryId: Number(form.categoryId || 1) };
@@ -132,10 +123,41 @@
                 await db.products.put(data);
                 setShowProductModal(false);
                 setEditingProduct(null);
+                setForm({ name: '', price: '', cost: '', categoryId: 1 });
                 refreshData();
             };
 
+            // Modifier Save/Edit (Image 8)
+            const handleSaveModifierGroup = async () => {
+                if(!modForm.name) return alert("กรุณาระบุชื่อกลุ่มตัวเลือก");
+                const data = { ...modForm };
+                if (editingModifier) data.id = editingModifier.id;
+                await db.modifierGroups.put(data);
+                setShowModifierModal(false);
+                setEditingModifier(null);
+                setModForm({ name: '', selectionType: 'single', applyTo: 'all', targetIds: [], options: [{ name: '', price: 0, cost: 0, isDefault: false }] });
+                refreshData();
+            };
+
+            const handleEditModifier = (m) => {
+                setEditingModifier(m);
+                setModForm(m);
+                setShowModifierModal(true);
+            };
+
+            // Category Logic
+            const handleAddCategory = async () => {
+                const name = prompt("ชื่อหมวดหมู่ใหม่:");
+                if (name) { await db.categories.add({ name }); refreshData(); }
+            };
+
+            const handleEditCategory = async (c) => {
+                const newName = prompt("แก้ไขชื่อหมวดหมู่:", c.name);
+                if (newName) { await db.categories.update(c.id, { name: newName }); refreshData(); }
+            };
+
             const handleConfirmPayment = async () => {
+                if (paymentMethod === 'cash' && Number(cashReceived) < cartTotal) return alert("เงินไม่พอ");
                 await db.orders.add({ total: cartTotal, timestamp: new Date(), paymentMethod, items: cart });
                 setCart([]); setShowPayment(false); setCashReceived(0);
                 refreshData();
@@ -147,6 +169,7 @@
             // ==========================================
             return (
                 <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
+                    {/* Header */}
                     <header className="luecha-blue p-4 text-white flex justify-between items-center shadow-lg z-10">
                         <h1 className="font-bold text-xl">เลื่องชื่อลือชา POS</h1>
                         <div className="flex gap-2">
@@ -156,6 +179,7 @@
                         </div>
                     </header>
 
+                    {/* VIEW: POS */}
                     {view === 'pos' && (
                         <div className="flex-1 flex overflow-hidden">
                             <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar bg-slate-100">
@@ -191,10 +215,12 @@
                         </div>
                     )}
 
+                    {/* VIEW: ADMIN */}
                     {view === 'admin' && (
                         <div className="flex-1 flex flex-col bg-white overflow-hidden">
                             <div className="flex border-b bg-slate-50 px-8 pt-4 gap-6">
                                 <button onClick={() => setAdminTab('products')} className={`pb-3 font-bold border-b-4 ${adminTab==='products'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>สินค้า</button>
+                                <button onClick={() => setAdminTab('categories')} className={`pb-3 font-bold border-b-4 ${adminTab==='categories'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>หมวดหมู่</button>
                                 <button onClick={() => setAdminTab('modifiers')} className={`pb-3 font-bold border-b-4 ${adminTab==='modifiers'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>ตัวเลือก</button>
                             </div>
                             <div className="flex-1 p-8 overflow-y-auto">
@@ -219,17 +245,34 @@
                                             </div>
                                         </div>
                                     )}
+                                    {adminTab === 'categories' && (
+                                        <div className="space-y-4">
+                                            <button onClick={handleAddCategory} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มหมวดหมู่</button>
+                                            {categories.map(c => (
+                                                <div key={c.id} className="p-4 border rounded-2xl flex justify-between items-center">
+                                                    <span className="font-bold">{c.name}</span>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => handleEditCategory(c)} className="text-teal text-sm font-bold bg-teal-50 px-3 py-1 rounded-lg">แก้ไข</button>
+                                                        <button onClick={async () => {if(confirm('ลบหมวดหมู่?')) {await db.categories.delete(c.id); refreshData();}}} className="text-red-400 text-sm">ลบ</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                     {adminTab === 'modifiers' && (
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <h2 className="text-2xl font-bold">กลุ่มตัวเลือกสินค้า</h2>
-                                                <button onClick={() => setShowModifierModal(true)} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มกลุ่มตัวเลือก</button>
+                                                <button onClick={() => {setEditingModifier(null); setModForm({name:'', selectionType:'single', applyTo:'all', targetIds:[], options:[{name:'', price:0, cost:0, isDefault:false}]}); setShowModifierModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มกลุ่มตัวเลือก</button>
                                             </div>
                                             {modifiers.map(m => (
                                                 <div key={m.id} className="p-5 border rounded-3xl bg-slate-50">
                                                     <div className="flex justify-between font-bold mb-2">
                                                         <span>{m.name} ({m.selectionType === 'single' ? '1 อย่าง' : 'หลายอย่าง'})</span>
-                                                        <button onClick={async () => {await db.modifierGroups.delete(m.id); refreshData();}} className="text-red-400">ลบ</button>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => handleEditModifier(m)} className="text-teal text-sm font-bold bg-teal-50 px-3 py-1 rounded-lg">แก้ไข</button>
+                                                            <button onClick={async () => {if(confirm('ลบกลุ่มตัวเลือก?')) {await db.modifierGroups.delete(m.id); refreshData();}}} className="text-red-400 text-sm">ลบ</button>
+                                                        </div>
                                                     </div>
                                                     <div className="flex flex-wrap gap-2">
                                                         {m.options.map((o, i) => <span key={i} className="bg-white px-3 py-1 rounded-xl text-xs border">{o.name} (+{o.price})</span>)}
@@ -238,6 +281,24 @@
                                             ))}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'report' && (
+                        <div className="flex-1 p-8 overflow-y-auto bg-white">
+                            <div className="max-w-4xl mx-auto">
+                                <h2 className="text-3xl font-bold mb-8">รายงานยอดขาย</h2>
+                                <div className="grid grid-cols-2 gap-6 mb-8">
+                                    <div className="luecha-blue p-8 rounded-[2.5rem] text-white">
+                                        <p className="opacity-70">ยอดขายรวม</p>
+                                        <p className="text-5xl font-black">{orders.reduce((s, o) => s + Number(o.total), 0).toLocaleString()}฿</p>
+                                    </div>
+                                    <div className="bg-slate-100 p-8 rounded-[2.5rem]">
+                                        <p className="text-slate-500">จำนวนบิล</p>
+                                        <p className="text-5xl font-black">{orders.length}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -321,28 +382,20 @@
                         </div>
                     )}
 
-                    {/* MODAL: IMAGE 8 (เพิ่มกลุ่มตัวเลือก - FULL UI) */}
+                    {/* MODAL: IMAGE 8 (Add/Edit Modifier Group) */}
                     {showModifierModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
                             <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
-                                {/* Header */}
                                 <div className="p-5 border-b flex justify-between items-center">
-                                    <span className="font-bold text-teal-600 text-xl">เพิ่มกลุ่มตัวเลือก</span>
-                                    <div className="flex gap-2">
-                                        <span className="text-slate-300">ⓘ</span>
-                                        <button onClick={() => setShowModifierModal(false)} className="text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
-                                    </div>
+                                    <span className="font-bold text-teal-600 text-xl">{editingModifier ? 'แก้ไขกลุ่มตัวเลือก' : 'เพิ่มกลุ่มตัวเลือก'}</span>
+                                    <button onClick={() => setShowModifierModal(false)} className="text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
                                 </div>
-
                                 <div className="p-6 space-y-6 overflow-y-auto no-scrollbar">
-                                    {/* ชื่อกลุ่ม */}
                                     <div>
                                         <label className="text-xs font-bold text-slate-700 uppercase">ชื่อกลุ่มตัวเลือก *</label>
                                         <input type="text" placeholder="เช่น ระดับความหวาน / ไซส์ / ท็อปปิ้ง" className="w-full border-b-2 border-slate-100 py-3 outline-none focus:border-teal-500 transition-all text-lg"
                                             value={modForm.name} onChange={e => setModForm({...modForm, name: e.target.value})} />
                                     </div>
-                                    
-                                    {/* ลูกค้าเลือกได้ */}
                                     <div>
                                         <label className="text-xs font-bold text-slate-700 uppercase">ลูกค้าเลือกได้</label>
                                         <div className="flex p-1 bg-slate-100 rounded-2xl mt-2">
@@ -350,8 +403,6 @@
                                             <button onClick={() => setModForm({...modForm, selectionType: 'multiple'})} className={`flex-1 py-3 rounded-xl font-bold transition-all ${modForm.selectionType==='multiple'?'bg-white text-teal-600 shadow-sm':'text-slate-400'}`}>หลายอย่าง</button>
                                         </div>
                                     </div>
-
-                                    {/* ใช้กับ */}
                                     <div>
                                         <label className="text-xs font-bold text-slate-700 uppercase">ใช้กับ</label>
                                         <div className="flex gap-2 mt-2">
@@ -373,8 +424,6 @@
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* ตัวเลือกย่อย */}
                                     <div>
                                         <div className="flex justify-between items-center mb-4">
                                             <label className="text-xs font-bold text-slate-700 uppercase">ตัวเลือกย่อย *</label>
@@ -419,9 +468,6 @@
                                             <button onClick={() => setModForm({...modForm, options: [...modForm.options, {name:'', price:0, cost:0, isDefault:false}]})}
                                                 className="w-full border-2 border-dashed border-teal-500 text-teal-600 py-3 rounded-2xl text-sm font-bold active-scale mt-2">+ เพิ่มตัวเลือก</button>
                                         </div>
-                                        <p className="text-[10px] text-slate-400 mt-4 leading-relaxed">
-                                            ติดดาว ★ = ตัวเลือกเริ่มต้นและทำให้ลูกค้า<b>ต้องเลือก</b>ในกลุ่มนี้ · ไม่ติดดาวเลย = ข้ามได้ · ราคาใส่ติดลบได้ (เช่น -5)
-                                        </p>
                                     </div>
                                 </div>
                                 <div className="p-6 border-t bg-white">
