@@ -26,18 +26,17 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // ==========================================
-        // PART 1: DATABASE (ล็อคโครงสร้างถาวร)
+       // ==========================================
+        // PART 1: DATABASE
         // ==========================================
         const db = new Dexie("LueCha_POS_Master_DB");
         db.version(1).stores({
             products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
-            modifierGroups: "++id, name, selectionType, applyTo, targetIds, isRequired",
+            // เพิ่ม targetCategoryIds เข้าไปในโครงสร้าง
+            modifierGroups: "++id, name, selectionType, applyTo, targetIds, targetCategoryIds, isRequired",
             orders: "++id, total, timestamp, paymentMethod"
         });
-
-        function App() {
             // ==========================================
             // PART 2: STATES
             // ==========================================
@@ -49,7 +48,6 @@
             const [orders, setOrders] = useState([]);
             const [cart, setCart] = useState([]);
 
-            // Modals
             const [selectedItem, setSelectedItem] = useState(null); 
             const [showProductModal, setShowProductModal] = useState(false); 
             const [showModifierModal, setShowModifierModal] = useState(false); 
@@ -57,23 +55,20 @@
             const [editingModifier, setEditingModifier] = useState(null);
             const [showPayment, setShowPayment] = useState(false); 
 
-            // Selection (Image 5)
             const [qty, setQty] = useState(1);
             const [size, setSize] = useState('S');
             const [activeToppings, setActiveToppings] = useState([]);
 
-            // Forms
             const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: '' });
+            
+            // อัปเดต modForm ให้มี targetCategoryIds: []
             const [modForm, setModForm] = useState({
-                name: '', selectionType: 'single', applyTo: 'all', targetIds: [], isRequired: false,
+                name: '', selectionType: 'single', applyTo: 'all', targetIds: [], targetCategoryIds: [], isRequired: false,
                 options: [{ name: '', price: 0, cost: 0, isDefault: false }]
             });
             const [openSection, setOpenSection] = useState('category');
-
-            // Payment
             const [cashReceived, setCashReceived] = useState(0);
             const [paymentMethod, setPaymentMethod] = useState('cash');
-
             // ==========================================
             // PART 3: INITIALIZATION
             // ==========================================
@@ -94,7 +89,7 @@
                 setOrders(await db.orders.toArray());
             };
 
-            // ==========================================
+           // ==========================================
             // PART 4: LOGIC
             // ==========================================
             const currentItemTotal = useMemo(() => {
@@ -109,10 +104,14 @@
             const cartTotal = useMemo(() => cart.reduce((s, i) => s + Number(i.totalPrice), 0), [cart]);
             const changeAmount = useMemo(() => Math.max(0, Number(cashReceived) - cartTotal), [cashReceived, cartTotal]);
 
-            // ฟีเจอร์ "บังคับเลือก" (Required Validation)
+            // แก้ไข Logic การตรวจสอบความถูกต้อง (Required) ให้เช็คหมวดหมู่ด้วย
             const isSelectionValid = useMemo(() => {
                 if (!selectedItem) return false;
-                const relevantModifiers = modifiers.filter(m => m.applyTo === 'all' || m.targetIds.includes(selectedItem.id));
+                const relevantModifiers = modifiers.filter(m => 
+                    m.applyTo === 'all' || 
+                    (m.applyTo === 'products' && m.targetIds.includes(selectedItem.id)) ||
+                    (m.applyTo === 'categories' && m.targetCategoryIds?.includes(Number(selectedItem.categoryId)))
+                );
                 const requiredGroups = relevantModifiers.filter(m => m.isRequired);
                 return requiredGroups.every(group => activeToppings.some(t => t.groupId === group.id));
             }, [selectedItem, modifiers, activeToppings]);
@@ -140,8 +139,23 @@
                 await db.modifierGroups.put(data);
                 setShowModifierModal(false);
                 setEditingModifier(null);
-                setModForm({ name: '', selectionType: 'single', applyTo: 'all', targetIds: [], isRequired: false, options: [{ name: '', price: 0, cost: 0, isDefault: false }] });
+                // รีเซ็ตฟอร์มให้มี targetCategoryIds ด้วย
+                setModForm({ name: '', selectionType: 'single', applyTo: 'all', targetIds: [], targetCategoryIds: [], isRequired: false, options: [{ name: '', price: 0, cost: 0, isDefault: false }] });
                 refreshData();
+            };
+
+            const handleAddCategory = async () => {
+                const name = prompt("ชื่อหมวดหมู่ใหม่:");
+                if (name) { await db.categories.add({ name }); refreshData(); }
+            };
+
+            const handleEditCategory = async (c) => {
+                const newName = prompt("แก้ไขชื่อหมวดหมู่:", c.name);
+                if (newName) { await db.categories.update(c.id, { name: newName }); refreshData(); }
+            };
+
+            const handleDeleteCategory = async (id) => {
+                if (confirm("ลบหมวดหมู่?")) { await db.categories.delete(id); refreshData(); }
             };
 
             const handleConfirmPayment = async () => {
@@ -292,7 +306,7 @@
                         </div>
                     )}
 
-                    {/* ==========================================
+               {/* ==========================================
                         PART 6: MODALS
                     ========================================== */}
                     
@@ -338,7 +352,12 @@
                                                 ))}
                                             </div>
                                         </div>
-                                        {modifiers.filter(m => m.applyTo === 'all' || m.targetIds.includes(selectedItem.id)).map(group => (
+                                        {/* กรองตัวเลือกตาม สินค้า หรือ หมวดหมู่ */}
+                                        {modifiers.filter(m => 
+                                            m.applyTo === 'all' || 
+                                            (m.applyTo === 'products' && m.targetIds.includes(selectedItem.id)) ||
+                                            (m.applyTo === 'categories' && m.targetCategoryIds?.includes(Number(selectedItem.categoryId)))
+                                        ).map(group => (
                                             <div key={group.id}>
                                                 <p className="font-bold mb-4">
                                                     {group.name} 
@@ -412,10 +431,27 @@
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-slate-700 uppercase">ใช้กับ</label>
-                                        <div className="flex gap-2 mt-2">
+                                        <div className="flex flex-wrap gap-2 mt-2">
                                             <button onClick={() => setModForm({...modForm, applyTo: 'all'})} className={`px-6 py-2 rounded-full border-2 text-sm font-bold ${modForm.applyTo==='all'?'border-teal-500 bg-teal-50 text-teal-600':'border-slate-100 text-slate-400'}`}>ทุกสินค้า</button>
+                                            <button onClick={() => setModForm({...modForm, applyTo: 'categories'})} className={`px-6 py-2 rounded-full border-2 text-sm font-bold ${modForm.applyTo==='categories'?'border-teal-500 bg-teal-50 text-teal-600':'border-slate-100 text-slate-400'}`}>บางหมวดหมู่</button>
                                             <button onClick={() => setModForm({...modForm, applyTo: 'products'})} className={`px-6 py-2 rounded-full border-2 text-sm font-bold ${modForm.applyTo==='products'?'border-teal-500 bg-teal-50 text-teal-600':'border-slate-100 text-slate-400'}`}>บางสินค้า</button>
                                         </div>
+                                        {/* ส่วนเลือกหมวดหมู่ */}
+                                        {modForm.applyTo === 'categories' && (
+                                            <div className="mt-4 p-4 bg-slate-50 rounded-3xl border max-h-48 overflow-y-auto no-scrollbar">
+                                                {categories.map(c => (
+                                                    <label key={c.id} className="flex items-center gap-3 mb-3 cursor-pointer group">
+                                                        <input type="checkbox" checked={modForm.targetCategoryIds?.includes(c.id)} 
+                                                            onChange={e => {
+                                                                const ids = modForm.targetCategoryIds || [];
+                                                                const nextIds = e.target.checked ? [...ids, c.id] : ids.filter(id => id !== c.id);
+                                                                setModForm({...modForm, targetCategoryIds: nextIds});
+                                                            }} className="w-6 h-6 accent-teal-600 rounded-lg" />
+                                                        <span className="text-sm font-medium text-slate-700 group-hover:text-teal-600">{c.name}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
                                         {modForm.applyTo === 'products' && (
                                             <div className="mt-4 p-4 bg-slate-50 rounded-3xl border max-h-48 overflow-y-auto no-scrollbar">
                                                 {products.map(p => (
@@ -449,13 +485,18 @@
                                                             setModForm({...modForm, options: newOpts});
                                                         }} />
                                                     <button onClick={() => {
+                                                        const newOpts = [...modForm.options];
+                                                        newOpts[idx].isDefault = !newOpts[idx].isDefault;
+                                                        setModForm({...modForm, options: newOpts});
+                                                    }} className={`text-xl ${opt.isDefault ? 'text-yellow-400' : 'text-slate-200'}`}>★</button>
+                                                    <button onClick={() => {
                                                         const newOpts = modForm.options.filter((_, i) => i !== idx);
                                                         setModForm({...modForm, options: newOpts});
                                                     }} className="text-red-400">🗑</button>
                                                 </div>
                                             ))}
                                             <button onClick={() => setModForm({...modForm, options: [...modForm.options, {name:'', price:0, cost:0, isDefault:false}]})}
-                                                className="w-full border-2 border-dashed border-teal-500 text-teal-600 py-3 rounded-2xl text-sm font-bold active-scale">+ เพิ่มตัวเลือก</button>
+                                                className="w-full border-2 border-dashed border-teal-500 text-teal-600 py-3 rounded-2xl text-sm font-bold active-scale mt-2">+ เพิ่มตัวเลือก</button>
                                         </div>
                                     </div>
                                 </div>
@@ -498,11 +539,18 @@
                                             </button>
                                             {openSection === 'category' && (
                                                 <div className="p-4 bg-slate-50 flex flex-wrap gap-2 border-t">
+                                                    <button onClick={handleAddCategory} className="border-2 border-dashed border-teal-500 text-teal-600 px-4 py-2 rounded-full text-sm font-bold active-scale">+ เพิ่มหมวด</button>
                                                     {categories.map(c => (
-                                                        <button key={c.id} onClick={() => setForm({...form, categoryId: c.id})}
-                                                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${form.categoryId===c.id?'btn-teal text-white':'bg-white text-slate-400 border'}`}>
-                                                            {c.name}
-                                                        </button>
+                                                        <div key={c.id} className="relative group">
+                                                            <button onClick={() => setForm({...form, categoryId: c.id})}
+                                                                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${form.categoryId===c.id?'btn-teal text-white':'bg-white text-slate-400 border'}`}>
+                                                                {c.name}
+                                                            </button>
+                                                            <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => handleEditCategory(c)} className="bg-blue-500 text-white w-5 h-5 rounded-full text-[10px] flex items-center justify-center">✎</button>
+                                                                <button onClick={() => handleDeleteCategory(c.id)} className="bg-red-500 text-white w-5 h-5 rounded-full text-[10px] flex items-center justify-center">✕</button>
+                                                            </div>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             )}
@@ -568,12 +616,3 @@
                             </div>
                         </div>
                     )}
-                </div>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
