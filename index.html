@@ -25,17 +25,17 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // ==========================================
+       // ==========================================
         // PART 1: DATABASE (โครงสร้างฐานข้อมูล)
         // ==========================================
         const db = new Dexie("LueCha_POS_Stable_DB");
-        db.version(1).stores({
+        // ขยับเป็น Version 2 เพื่อเพิ่ม modifierGroups
+        db.version(2).stores({
             products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
+            modifierGroups: "++id, name, options", // เก็บกลุ่มตัวเลือก เช่น {name: "ท็อปปิ้ง", options: [{name: "มุก", price: 10}]}
             orders: "++id, total, timestamp, paymentMethod, items"
         });
-
-        function App() {
             // ==========================================
             // PART 2: STATES (ตัวแปรควบคุมระบบ)
             // ==========================================
@@ -44,6 +44,7 @@
             const [categories, setCategories] = useState([]);
             const [orders, setOrders] = useState([]);
             const [cart, setCart] = useState([]);
+            const [modifiers, setModifiers] = useState([]); // เก็บรายการกลุ่มตัวเลือกทั้งหมด
 
             const [selectedItem, setSelectedItem] = useState(null); 
             const [showProductModal, setShowProductModal] = useState(false); 
@@ -130,7 +131,37 @@
                 refreshData();
                 alert("ชำระเงินสำเร็จ!");
             };
+// ฟังก์ชันเพิ่มกลุ่มตัวเลือกใหม่
+            const handleAddModifierGroup = async () => {
+                const name = prompt("ชื่อกลุ่มตัวเลือก (เช่น ท็อปปิ้ง หรือ ระดับความหวาน):");
+                if (!name) return;
+                const optionsStr = prompt("ระบุตัวเลือกและราคา (รูปแบบ: ชื่อ:ราคา, ชื่อ:ราคา) \nตัวอย่าง: ไข่มุก:10, วิปครีม:20");
+                if (optionsStr) {
+                    const options = optionsStr.split(',').map(item => {
+                        const [optName, price] = item.split(':');
+                        return { name: optName.trim(), price: Number(price.trim() || 0) };
+                    });
+                    await db.modifierGroups.add({ name, options });
+                    refreshData();
+                }
+            };
 
+            // ฟังก์ชันลบกลุ่มตัวเลือก
+            const handleDeleteModifierGroup = async (id) => {
+                if (confirm("ต้องการลบกลุ่มตัวเลือกนี้ใช่หรือไม่?")) {
+                    await db.modifierGroups.delete(id);
+                    refreshData();
+                }
+            };
+
+            // อัปเดตฟังก์ชัน refreshData ให้ดึงข้อมูล Modifiers ด้วย
+            // (ให้หาฟังก์ชัน refreshData เดิมแล้ววางทับด้วยอันนี้)
+            const refreshData = async () => {
+                setProducts(await db.products.toArray());
+                setCategories(await db.categories.toArray());
+                setOrders(await db.orders.toArray());
+                setModifiers(await db.modifierGroups.toArray()); // ดึงข้อมูลตัวเลือก
+            };
             // ==========================================
             // PART 5: UI RENDER
             // ==========================================
