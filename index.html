@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Final Master Stable</title>
+    <title>Lue cha POS | Master Stable</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -17,7 +17,6 @@
         .luecha-blue { background-color: #003399; }
         .luecha-orange { background-color: #FF6600; }
         .btn-teal { background-color: #2497a9; }
-        .text-teal { color: #2497a9; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -26,21 +25,17 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // ==========================================
-        // PART 1: DATABASE (ล็อคชื่อถาวร)
-        // ==========================================
-        const db = new Dexie("LueCha_POS_ULTIMATE_V1");
+        // 1. Database Setup
+        const db = new Dexie("LueCha_POS_FINAL_V2");
         db.version(1).stores({
             products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
             modifierGroups: "++id, name, options",
-            orders: "++id, total, timestamp, paymentMethod, items"
+            orders: "++id, total, timestamp, paymentMethod"
         });
 
         function App() {
-            // ==========================================
-            // PART 2: STATES
-            // ==========================================
+            // 2. States
             const [view, setView] = useState('pos');
             const [adminTab, setAdminTab] = useState('products');
             const [products, setProducts] = useState([]);
@@ -55,22 +50,20 @@
             const [editingProduct, setEditingProduct] = useState(null);
             const [showPayment, setShowPayment] = useState(false); // Image 4
 
-            // Selection (Image 5)
+            // Selection Logic (Image 5)
             const [qty, setQty] = useState(1);
             const [size, setSize] = useState('S');
             const [activeToppings, setActiveToppings] = useState([]);
 
-            // Form (Image 7)
+            // Form Logic (Image 7)
             const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: '' });
             const [openSection, setOpenSection] = useState('category');
 
-            // Payment (Image 4)
+            // Payment Logic (Image 4)
             const [cashReceived, setCashReceived] = useState(0);
             const [paymentMethod, setPaymentMethod] = useState('cash');
 
-            // ==========================================
-            // PART 3: INITIALIZATION
-            // ==========================================
+            // 3. Initialization
             useEffect(() => {
                 const init = async () => {
                     if (await db.categories.count() === 0) {
@@ -81,9 +74,6 @@
                             { name: "ชาไทย (Thai Tea)", price: 35, cost: 15, categoryId: 1 },
                             { name: "โกโก้ (Cocoa)", price: 35, cost: 18, categoryId: 1 }
                         ]);
-                    }
-                    if (await db.modifierGroups.count() === 0) {
-                        await db.modifierGroups.add({ name: "ท็อปปิ้ง", options: [{name: "วิปครีม", price: 20}, {name: "ชีสขูด", price: 20}] });
                     }
                     refreshData();
                 };
@@ -97,9 +87,7 @@
                 setOrders(await db.orders.toArray());
             };
 
-            // ==========================================
-            // PART 4: LOGIC
-            // ==========================================
+            // 4. Calculations
             const currentItemTotal = useMemo(() => {
                 if (!selectedItem) return 0;
                 let base = Number(selectedItem.price);
@@ -112,10 +100,12 @@
             const cartTotal = useMemo(() => cart.reduce((s, i) => s + Number(i.totalPrice), 0), [cart]);
             const changeAmount = useMemo(() => Math.max(0, Number(cashReceived) - cartTotal), [cashReceived, cartTotal]);
 
+            // 5. Handlers
             const handleAddToCart = () => {
                 const item = { ...selectedItem, cartId: Date.now(), qty, size, toppings: activeToppings, totalPrice: currentItemTotal };
                 setCart([...cart, item]);
                 setSelectedItem(null);
+                setQty(1); setSize('S'); setActiveToppings([]);
             };
 
             const handleSaveProduct = async () => {
@@ -135,7 +125,7 @@
             };
 
             const handleAddModifier = async () => {
-                const name = prompt("ชื่อกลุ่มตัวเลือก (เช่น ระดับความหวาน):");
+                const name = prompt("ชื่อกลุ่มตัวเลือก (เช่น ท็อปปิ้ง):");
                 if (!name) return;
                 const opts = prompt("ระบุตัวเลือก (รูปแบบ ชื่อ:ราคา, ชื่อ:ราคา):");
                 if (opts) {
@@ -156,9 +146,7 @@
                 alert("ชำระเงินสำเร็จ!");
             };
 
-            // ==========================================
-            // PART 5: UI RENDER
-            // ==========================================
+            // 6. UI Render
             return (
                 <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
                     {/* Header */}
@@ -218,8 +206,8 @@
                             <div className="flex-1 p-8 overflow-y-auto">
                                 <div className="max-w-4xl mx-auto">
                                     {adminTab === 'products' && (
-                                        <>
-                                            <div className="flex justify-between items-center mb-6">
+                                        <div className="space-y-6">
+                                            <div className="flex justify-between items-center">
                                                 <h2 className="text-2xl font-bold">รายการสินค้า</h2>
                                                 <button onClick={() => {setEditingProduct(null); setForm({name:'', price:'', cost:'', categoryId:1}); setShowProductModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มสินค้า</button>
                                             </div>
@@ -235,7 +223,7 @@
                                                     </div>
                                                 ))}
                                             </div>
-                                        </>
+                                        </div>
                                     )}
                                     {adminTab === 'categories' && (
                                         <div className="space-y-4">
@@ -287,10 +275,6 @@
                         </div>
                     )}
 
-                    {/* ==========================================
-                        PART 6: MODALS
-                    ========================================== */}
-                    
                     {/* MODAL: IMAGE 5 (Ordering) */}
                     {selectedItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
