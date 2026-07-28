@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Production Master v1.2</title>
+    <title>Lue cha POS | Final Master Template</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -18,7 +18,6 @@
         .luecha-orange { background-color: #FF6600; }
         .btn-teal { background-color: #2497a9; }
         .text-teal { color: #2497a9; }
-        .border-teal { border-color: #2497a9; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -36,27 +35,32 @@
             orders: "++id, total, timestamp, paymentMethod, items, queue"
         });
 
+        const TOPPINGS_LIST = [
+            { name: "วิปครีม", price: 20 },
+            { name: "ชีสขูด", price: 20 }
+        ];
+
         function App() {
             const [view, setView] = useState('pos');
             const [adminTab, setAdminTab] = useState('products');
             const [products, setProducts] = useState([]);
             const [categories, setCategories] = useState([]);
-            const [modifiers, setModifiers] = useState([]);
             const [orders, setOrders] = useState([]);
             const [cart, setCart] = useState([]);
 
-            // Modals
-            const [selectedItem, setSelectedItem] = useState(null); 
-            const [showProductModal, setShowProductModal] = useState(false); // ป๊อปอัพ Image 7
-            const [editingProduct, setEditingProduct] = useState(null); // สำหรับโหมดแก้ไข
+            // --- MODAL STATES ---
+            const [selectedItem, setSelectedItem] = useState(null); // สำหรับ Image 5 (เลือกไซส์/ท็อปปิ้ง)
+            const [showProductModal, setShowProductModal] = useState(false); // สำหรับ Image 7 (เพิ่ม/แก้ไข)
+            const [editingProduct, setEditingProduct] = useState(null);
 
-            // UI Toggle Sections (Image 7)
-            const [openSection, setOpenSection] = useState('category'); // category, modifiers, delivery
+            // --- SELECTION STATES (Image 5) ---
+            const [qty, setQty] = useState(1);
+            const [selectedSize, setSelectedSize] = useState('S');
+            const [activeToppings, setActiveToppings] = useState([]);
 
-            // Form State (Image 7)
-            const [form, setForm] = useState({
-                name: '', price: '', cost: '', categoryId: 1, deliveryPrices: {}
-            });
+            // --- FORM STATES (Image 7) ---
+            const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: 1 });
+            const [openSection, setOpenSection] = useState('category');
 
             useEffect(() => {
                 refreshData();
@@ -65,36 +69,53 @@
             const refreshData = async () => {
                 setProducts(await db.products.toArray());
                 setCategories(await db.categories.toArray());
-                setModifiers(await db.modifierGroups.toArray());
                 setOrders(await db.orders.toArray());
             };
 
-            // --- Logic: บันทึก/แก้ไขสินค้า (Image 7) ---
+            // --- MATH LOGIC ---
+            const currentItemTotal = useMemo(() => {
+                if (!selectedItem) return 0;
+                let base = Number(selectedItem.price);
+                if (selectedSize === 'M') base += 5;
+                if (selectedSize === 'L') base += 10;
+                const toppingSum = activeToppings.reduce((s, t) => s + Number(t.price), 0);
+                return (base + toppingSum) * Number(qty);
+            }, [selectedItem, selectedSize, activeToppings, qty]);
+
+            const cartTotal = useMemo(() => cart.reduce((s, i) => s + Number(i.totalPrice), 0), [cart]);
+
+            // --- ACTIONS ---
+            const handleAddToCart = () => {
+                const item = {
+                    ...selectedItem,
+                    cartId: Date.now(),
+                    qty: Number(qty),
+                    size: selectedSize,
+                    toppings: activeToppings,
+                    totalPrice: currentItemTotal
+                };
+                setCart([...cart, item]);
+                setSelectedItem(null);
+                setQty(1); setSelectedSize('S'); setActiveToppings([]);
+            };
+
             const handleSaveProduct = async () => {
                 if(!form.name || !form.price) return alert("กรุณากรอกชื่อและราคา");
-                const data = {
-                    ...form,
-                    price: Number(form.price),
-                    cost: Number(form.cost || 0),
-                    categoryId: Number(form.categoryId)
-                };
-                if (editingProduct) data.id = editingProduct.id; // ถ้ามี ID จะเป็นการ Update
-
-                await db.products.put(data); // put จะทำทั้ง Add และ Update
+                const data = { ...form, price: Number(form.price), cost: Number(form.cost || 0), categoryId: Number(form.categoryId) };
+                if (editingProduct) data.id = editingProduct.id;
+                await db.products.put(data);
                 setShowProductModal(false);
                 setEditingProduct(null);
-                setForm({ name: '', price: '', cost: '', categoryId: 1, deliveryPrices: {} });
+                setForm({ name: '', price: '', cost: '', categoryId: 1 });
                 refreshData();
             };
 
-            const openEditProduct = (p) => {
-                setEditingProduct(p);
-                setForm(p);
-                setShowProductModal(true);
+            const handleCheckout = async () => {
+                await db.orders.add({ total: cartTotal, timestamp: new Date(), paymentMethod: 'cash', items: cart });
+                setCart([]);
+                refreshData();
+                alert("ชำระเงินสำเร็จ!");
             };
-
-            // --- Logic: ชำระเงิน ---
-            const cartTotal = useMemo(() => cart.reduce((s, i) => s + Number(i.totalPrice || i.price), 0), [cart]);
 
             return (
                 <div className="h-screen flex flex-col overflow-hidden">
@@ -114,7 +135,7 @@
                             <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar">
                                 {products.map(p => (
                                     <button key={p.id} onClick={() => setSelectedItem(p)}
-                                        className="bg-white p-5 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-44 border-2 border-transparent hover:border-orange-500">
+                                        className="bg-white p-5 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-44 border-2 border-transparent hover:border-orange-500 transition-all">
                                         <span className="font-bold text-slate-800 text-lg">{p.name}</span>
                                         <span className="text-blue-700 font-black text-2xl">{p.price}฿</span>
                                     </button>
@@ -126,8 +147,8 @@
                                     {cart.map(item => (
                                         <div key={item.cartId} className="bg-slate-50 p-4 rounded-2xl relative border">
                                             <div className="flex justify-between font-bold">
-                                                <span>{item.name}</span>
-                                                <span>{item.totalPrice || item.price}฿</span>
+                                                <span>{item.name} x{item.qty} ({item.size})</span>
+                                                <span>{item.totalPrice}฿</span>
                                             </div>
                                             <button onClick={() => setCart(cart.filter(i => i.cartId !== item.cartId))} className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-xs">✕</button>
                                         </div>
@@ -138,7 +159,7 @@
                                         <span>รวม</span>
                                         <span>{cartTotal}฿</span>
                                     </div>
-                                    <button disabled={cart.length===0} className="w-full luecha-orange text-white py-5 rounded-3xl font-bold text-xl active-scale disabled:opacity-30">ชำระเงิน</button>
+                                    <button onClick={handleCheckout} disabled={cart.length===0} className="w-full luecha-orange text-white py-5 rounded-3xl font-bold text-xl active-scale disabled:opacity-30">ชำระเงิน</button>
                                 </div>
                             </div>
                         </div>
@@ -149,13 +170,12 @@
                         <div className="flex-1 flex flex-col bg-white overflow-hidden">
                             <div className="flex border-b bg-slate-50 px-8 pt-4 gap-6">
                                 <button onClick={() => setAdminTab('products')} className={`pb-3 font-bold border-b-4 ${adminTab==='products'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>สินค้า</button>
-                                <button onClick={() => setAdminTab('stock')} className={`pb-3 font-bold border-b-4 ${adminTab==='stock'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>สต็อก</button>
                             </div>
                             <div className="flex-1 p-8 overflow-y-auto">
                                 <div className="max-w-4xl mx-auto">
                                     <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-2xl font-bold">รายการสินค้าทั้งหมด</h2>
-                                        <button onClick={() => {setEditingProduct(null); setForm({name:'', price:'', cost:'', categoryId:1, deliveryPrices:{}}); setShowProductModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มสินค้า</button>
+                                        <h2 className="text-2xl font-bold text-slate-800">รายการสินค้า</h2>
+                                        <button onClick={() => {setEditingProduct(null); setForm({name:'', price:'', cost:'', categoryId:1}); setShowProductModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มสินค้า</button>
                                     </div>
                                     <div className="grid gap-3">
                                         {products.map(p => (
@@ -163,7 +183,7 @@
                                                 <span className="font-bold text-lg">{p.name}</span>
                                                 <div className="flex items-center gap-4">
                                                     <span className="text-blue-600 font-bold">{p.price}฿</span>
-                                                    <button onClick={() => openEditProduct(p)} className="text-teal font-bold bg-teal-50 px-4 py-1 rounded-lg">แก้ไข</button>
+                                                    <button onClick={() => {setEditingProduct(p); setForm(p); setShowProductModal(true);}} className="text-teal font-bold bg-teal-50 px-4 py-1 rounded-lg">แก้ไข</button>
                                                     <button onClick={async () => {if(confirm('ลบ?')) {await db.products.delete(p.id); refreshData();}}} className="text-red-400">ลบ</button>
                                                 </div>
                                             </div>
@@ -174,51 +194,127 @@
                         </div>
                     )}
 
+                    {/* VIEW: REPORT */}
+                    {view === 'report' && (
+                        <div className="flex-1 p-8 overflow-y-auto bg-white">
+                            <div className="max-w-4xl mx-auto">
+                                <h2 className="text-3xl font-bold mb-8">รายงานยอดขาย</h2>
+                                <div className="grid grid-cols-2 gap-6 mb-8">
+                                    <div className="luecha-blue p-8 rounded-[2.5rem] text-white">
+                                        <p className="opacity-70">ยอดขายรวม</p>
+                                        <p className="text-5xl font-black">{orders.reduce((s, o) => s + Number(o.total), 0).toLocaleString()}฿</p>
+                                    </div>
+                                    <div className="bg-slate-100 p-8 rounded-[2.5rem]">
+                                        <p className="text-slate-500">จำนวนบิล</p>
+                                        <p className="text-5xl font-black">{orders.length}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- MODAL: ยืนยันจำนวนสินค้า (Image 5) --- */}
+                    {selectedItem && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                            <div className="bg-white w-full max-w-4xl rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                                <div className="p-4 border-b flex justify-between items-center">
+                                    <span className="font-bold text-slate-700 tracking-tight">ยืนยันจำนวนสินค้า</span>
+                                    <button onClick={() => setSelectedItem(null)} className="text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
+                                </div>
+                                <div className="flex flex-col md:flex-row">
+                                    <div className="flex-1 p-8 space-y-8 border-r">
+                                        <div className="flex gap-6 items-center bg-slate-50 p-6 rounded-[2rem]">
+                                            <div className="w-24 h-24 bg-white rounded-2xl shadow-sm flex items-center justify-center text-4xl">🥤</div>
+                                            <div>
+                                                <h3 className="text-2xl font-bold">{selectedItem.name}</h3>
+                                                <p className="text-slate-400">ราคา {selectedItem.price} บาท</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold text-lg">จำนวน</span>
+                                            <div className="flex items-center gap-6">
+                                                <button onClick={() => setQty(Math.max(1, qty-1))} className="w-12 h-12 rounded-2xl bg-red-50 text-red-500 text-2xl font-bold active-scale">-</button>
+                                                <span className="text-3xl font-black w-8 text-center">{qty}</span>
+                                                <button onClick={() => setQty(qty+1)} className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 text-2xl font-bold active-scale">+</button>
+                                            </div>
+                                        </div>
+                                        <div className="pt-4 border-t flex justify-between text-2xl font-black">
+                                            <span>ราคารวม</span>
+                                            <span className="text-red-500">{currentItemTotal} บาท</span>
+                                        </div>
+                                    </div>
+                                    <div className="w-full md:w-[400px] p-8 bg-slate-50/30 space-y-8">
+                                        <div>
+                                            <p className="font-bold mb-4">ไซส์ <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">จำเป็น</span></p>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {['S', 'M', 'L'].map(s => (
+                                                    <button key={s} onClick={() => setSelectedSize(s)}
+                                                        className={`py-4 rounded-2xl font-bold border-2 transition-all ${selectedSize===s?'btn-teal text-white border-transparent':'bg-white border-slate-100 text-slate-400'}`}>
+                                                        {s} <div className="text-[10px] font-normal">{s==='S'?'':s==='M'?'+5':'+10'}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="font-bold mb-4">ท็อปปิ้ง <span className="bg-slate-200 text-slate-500 text-[10px] px-2 py-0.5 rounded-full font-normal">ไม่บังคับ</span></p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {TOPPINGS_LIST.map(t => {
+                                                    const isSel = activeToppings.find(x => x.name === t.name);
+                                                    return (
+                                                        <button key={t.name} onClick={() => {
+                                                            const next = isSel ? activeToppings.filter(x => x.name !== t.name) : [...activeToppings, t];
+                                                            setActiveToppings(next);
+                                                        }} className={`px-4 py-2 rounded-full border-2 text-sm transition-all ${isSel?'border-teal-500 bg-teal-50 text-teal-600 font-bold':'bg-white border-slate-100 text-slate-400'}`}>
+                                                            {t.name} +{t.price}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-white border-t">
+                                    <button onClick={handleAddToCart} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale">🛒 เพิ่มลงตะกร้า</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* --- MODAL: เพิ่ม/แก้ไขสินค้า (Image 7) --- */}
                     {showProductModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
-                                {/* Header */}
                                 <div className="p-5 border-b flex justify-between items-center">
                                     <span className="font-bold text-teal-600 text-xl">{editingProduct ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า'}</span>
-                                    <div className="flex gap-2">
-                                        <span className="text-slate-300">ⓘ</span>
-                                        <button onClick={() => setShowProductModal(false)} className="text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
-                                    </div>
+                                    <button onClick={() => setShowProductModal(false)} className="text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
                                 </div>
-
-                                {/* Body */}
                                 <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
-                                    {/* Top Info */}
                                     <div className="flex gap-6">
-                                        <div className="w-28 h-28 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center text-slate-300 cursor-pointer">
+                                        <div className="w-28 h-28 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center text-slate-300">
                                             <span className="text-3xl">?</span>
                                             <span className="text-[10px]">เลือกรูป</span>
                                         </div>
                                         <div className="flex-1 space-y-4">
                                             <div>
-                                                <label className="text-xs font-bold text-slate-700">ชื่อสินค้า <span className="text-red-500">*</span></label>
+                                                <label className="text-xs font-bold text-slate-700 uppercase">ชื่อสินค้า *</label>
                                                 <input type="text" placeholder="เช่น กาแฟเย็น" className="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-teal-500 transition-all"
                                                     value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
                                             </div>
                                             <div className="flex gap-4">
                                                 <div className="flex-1">
-                                                    <label className="text-xs font-bold text-slate-700">ราคาขาย <span className="text-red-500">*</span></label>
+                                                    <label className="text-xs font-bold text-slate-700 uppercase">ราคาขาย *</label>
                                                     <input type="number" placeholder="0" className="w-full bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500"
                                                         value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <label className="text-xs font-bold text-slate-700">ต้นทุน</label>
+                                                    <label className="text-xs font-bold text-slate-700 uppercase">ต้นทุน</label>
                                                     <input type="number" placeholder="0" className="w-full bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500"
                                                         value={form.cost} onChange={e => setForm({...form, cost: e.target.value})} />
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Accordion Sections */}
                                     <div className="space-y-3">
-                                        {/* Category Section */}
                                         <div className="border rounded-2xl overflow-hidden">
                                             <button onClick={() => setOpenSection(openSection==='category'?'':'category')} className="w-full p-4 flex justify-between items-center bg-white">
                                                 <div className="flex items-center gap-3 text-teal-600 font-bold">🏷️ หมวดหมู่</div>
@@ -236,51 +332,10 @@
                                                 </div>
                                             )}
                                         </div>
-
-                                        {/* Modifiers Section */}
-                                        <div className="border rounded-2xl overflow-hidden">
-                                            <button onClick={() => setOpenSection(openSection==='modifiers'?'':'modifiers')} className="w-full p-4 flex justify-between items-center bg-white">
-                                                <div className="flex items-center gap-3 text-teal-600 font-bold">📑 ตัวเลือกสินค้า <span className="text-xs font-normal text-slate-400">· 1 กลุ่ม</span></div>
-                                                <span>{openSection==='modifiers'?'▲':'▼'}</span>
-                                            </button>
-                                            {openSection === 'modifiers' && (
-                                                <div className="p-4 bg-slate-50 space-y-3 border-t">
-                                                    <div className="bg-white p-4 rounded-2xl border flex justify-between items-center">
-                                                        <div>
-                                                            <p className="font-bold text-slate-700">ไซส์ ⭐</p>
-                                                            <p className="text-[10px] text-slate-400">ทุกสินค้า · เลือกได้ 1 อย่าง · 3 ตัวเลือก</p>
-                                                        </div>
-                                                        <button className="text-slate-400">✎</button>
-                                                    </div>
-                                                    <button className="border-2 border-dashed border-teal-500 text-teal-600 px-4 py-2 rounded-full text-sm font-bold">+ เพิ่มกลุ่มตัวเลือก</button>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Delivery Section */}
-                                        <div className="border rounded-2xl overflow-hidden">
-                                            <button onClick={() => setOpenSection(openSection==='delivery'?'':'delivery')} className="w-full p-4 flex justify-between items-center bg-white">
-                                                <div className="flex items-center gap-3 text-teal-600 font-bold">🛵 ราคาขายเดลิเวอรี่</div>
-                                                <span>{openSection==='delivery'?'▲':'▼'}</span>
-                                            </button>
-                                            {openSection === 'delivery' && (
-                                                <div className="p-4 bg-slate-50 space-y-4 border-t">
-                                                    <p className="text-[10px] text-slate-400">เลือกแอปที่ขาย แล้วกรอก %GP เพื่อเริ่มตั้งราคา</p>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {['GrabFood', 'LINE MAN', 'ShopeeFood', 'Robinhood'].map(app => (
-                                                            <button key={app} className="border-2 border-dashed border-teal-500 text-teal-600 px-4 py-2 rounded-full text-sm font-bold">+ {app}</button>
-                                                        ))}
-                                                        <button className="bg-slate-200 text-slate-500 px-4 py-2 rounded-full text-sm font-bold">+ แอปอื่น</button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
                                     </div>
                                 </div>
-
-                                {/* Footer */}
                                 <div className="p-6">
-                                    <button onClick={handleSaveProduct} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale flex items-center justify-center gap-3">
+                                    <button onClick={handleSaveProduct} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale flex items-center justify-center gap-3 shadow-lg">
                                         💾 บันทึก
                                     </button>
                                 </div>
