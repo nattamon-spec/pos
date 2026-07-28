@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Master v1.4</title>
+    <title>Lue cha POS | Final Master Stable</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -17,6 +17,7 @@
         .luecha-blue { background-color: #003399; }
         .luecha-orange { background-color: #FF6600; }
         .btn-teal { background-color: #2497a9; }
+        .text-teal { color: #2497a9; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -26,10 +27,10 @@
         const { useState, useEffect, useMemo } = React;
 
         // ==========================================
-        // PART 1: DATABASE (ล็อคโครงสร้าง Version 2)
+        // PART 1: DATABASE (ล็อคชื่อถาวร)
         // ==========================================
-        const db = new Dexie("LueCha_POS_Stable_DB");
-        db.version(2).stores({
+        const db = new Dexie("LueCha_POS_ULTIMATE_V1");
+        db.version(1).stores({
             products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
             modifierGroups: "++id, name, options",
@@ -41,6 +42,7 @@
             // PART 2: STATES
             // ==========================================
             const [view, setView] = useState('pos');
+            const [adminTab, setAdminTab] = useState('products');
             const [products, setProducts] = useState([]);
             const [categories, setCategories] = useState([]);
             const [modifiers, setModifiers] = useState([]);
@@ -48,10 +50,10 @@
             const [cart, setCart] = useState([]);
 
             // Modals
-            const [selectedItem, setSelectedItem] = useState(null); 
-            const [showProductModal, setShowProductModal] = useState(false); 
+            const [selectedItem, setSelectedItem] = useState(null); // Image 5
+            const [showProductModal, setShowProductModal] = useState(false); // Image 7
             const [editingProduct, setEditingProduct] = useState(null);
-            const [showPayment, setShowPayment] = useState(false); 
+            const [showPayment, setShowPayment] = useState(false); // Image 4
 
             // Selection (Image 5)
             const [qty, setQty] = useState(1);
@@ -59,7 +61,7 @@
             const [activeToppings, setActiveToppings] = useState([]);
 
             // Form (Image 7)
-            const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: 1 });
+            const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: '' });
             const [openSection, setOpenSection] = useState('category');
 
             // Payment (Image 4)
@@ -71,7 +73,18 @@
             // ==========================================
             useEffect(() => {
                 const init = async () => {
-                    if (await db.categories.count() === 0) await db.categories.add({ name: "เครื่องดื่ม" });
+                    if (await db.categories.count() === 0) {
+                        await db.categories.bulkAdd([{ name: "เครื่องดื่ม" }, { name: "พิเศษ" }]);
+                    }
+                    if (await db.products.count() === 0) {
+                        await db.products.bulkAdd([
+                            { name: "ชาไทย (Thai Tea)", price: 35, cost: 15, categoryId: 1 },
+                            { name: "โกโก้ (Cocoa)", price: 35, cost: 18, categoryId: 1 }
+                        ]);
+                    }
+                    if (await db.modifierGroups.count() === 0) {
+                        await db.modifierGroups.add({ name: "ท็อปปิ้ง", options: [{name: "วิปครีม", price: 20}, {name: "ชีสขูด", price: 20}] });
+                    }
                     refreshData();
                 };
                 init();
@@ -107,7 +120,7 @@
 
             const handleSaveProduct = async () => {
                 if(!form.name || !form.price) return alert("กรุณากรอกชื่อและราคา");
-                const data = { ...form, price: Number(form.price), cost: Number(form.cost || 0), categoryId: Number(form.categoryId) };
+                const data = { ...form, price: Number(form.price), cost: Number(form.cost || 0), categoryId: Number(form.categoryId || 1) };
                 if (editingProduct) data.id = editingProduct.id;
                 await db.products.put(data);
                 setShowProductModal(false);
@@ -121,26 +134,18 @@
                 if (name) { await db.categories.add({ name }); refreshData(); }
             };
 
-            const handleDeleteCategory = async (id) => {
-                if (confirm("ลบหมวดหมู่?")) { await db.categories.delete(id); refreshData(); }
-            };
-
-            const handleAddModifierGroup = async () => {
-                const name = prompt("ชื่อกลุ่มตัวเลือก (เช่น ท็อปปิ้ง):");
+            const handleAddModifier = async () => {
+                const name = prompt("ชื่อกลุ่มตัวเลือก (เช่น ระดับความหวาน):");
                 if (!name) return;
-                const optionsStr = prompt("ระบุตัวเลือก (รูปแบบ ชื่อ:ราคา, ชื่อ:ราคา):");
-                if (optionsStr) {
-                    const options = optionsStr.split(',').map(i => {
+                const opts = prompt("ระบุตัวเลือก (รูปแบบ ชื่อ:ราคา, ชื่อ:ราคา):");
+                if (opts) {
+                    const options = opts.split(',').map(i => {
                         const [n, p] = i.split(':');
                         return { name: n.trim(), price: Number(p.trim() || 0) };
                     });
                     await db.modifierGroups.add({ name, options });
                     refreshData();
                 }
-            };
-
-            const handleDeleteModifierGroup = async (id) => {
-                if (confirm("ลบกลุ่มตัวเลือก?")) { await db.modifierGroups.delete(id); refreshData(); }
             };
 
             const handleConfirmPayment = async () => {
@@ -156,6 +161,7 @@
             // ==========================================
             return (
                 <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
+                    {/* Header */}
                     <header className="luecha-blue p-4 text-white flex justify-between items-center shadow-lg z-10">
                         <h1 className="font-bold text-xl">เลื่องชื่อลือชา POS</h1>
                         <div className="flex gap-2">
@@ -165,6 +171,7 @@
                         </div>
                     </header>
 
+                    {/* VIEW: POS */}
                     {view === 'pos' && (
                         <div className="flex-1 flex overflow-hidden">
                             <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar bg-slate-100">
@@ -200,24 +207,63 @@
                         </div>
                     )}
 
+                    {/* VIEW: ADMIN */}
                     {view === 'admin' && (
-                        <div className="flex-1 p-8 overflow-y-auto bg-white">
-                            <div className="max-w-4xl mx-auto">
-                                <div className="flex justify-between items-center mb-8">
-                                    <h2 className="text-2xl font-bold">รายการสินค้า</h2>
-                                    <button onClick={() => {setEditingProduct(null); setForm({name:'', price:'', cost:'', categoryId:1}); setShowProductModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มสินค้า</button>
-                                </div>
-                                <div className="grid gap-3">
-                                    {products.map(p => (
-                                        <div key={p.id} className="flex justify-between items-center p-5 bg-slate-50 rounded-3xl border">
-                                            <span className="font-bold text-lg">{p.name}</span>
-                                            <div className="flex items-center gap-4">
-                                                <span className="text-blue-600 font-bold">{p.price}฿</span>
-                                                <button onClick={() => {setEditingProduct(p); setForm(p); setShowProductModal(true);}} className="text-teal font-bold bg-teal-50 px-4 py-1 rounded-lg">แก้ไข</button>
-                                                <button onClick={async () => {if(confirm('ลบ?')) {await db.products.delete(p.id); refreshData();}}} className="text-red-400">ลบ</button>
+                        <div className="flex-1 flex flex-col bg-white overflow-hidden">
+                            <div className="flex border-b bg-slate-50 px-8 pt-4 gap-6">
+                                <button onClick={() => setAdminTab('products')} className={`pb-3 font-bold border-b-4 ${adminTab==='products'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>สินค้า</button>
+                                <button onClick={() => setAdminTab('categories')} className={`pb-3 font-bold border-b-4 ${adminTab==='categories'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>หมวดหมู่</button>
+                                <button onClick={() => setAdminTab('modifiers')} className={`pb-3 font-bold border-b-4 ${adminTab==='modifiers'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>ตัวเลือก</button>
+                            </div>
+                            <div className="flex-1 p-8 overflow-y-auto">
+                                <div className="max-w-4xl mx-auto">
+                                    {adminTab === 'products' && (
+                                        <>
+                                            <div className="flex justify-between items-center mb-6">
+                                                <h2 className="text-2xl font-bold">รายการสินค้า</h2>
+                                                <button onClick={() => {setEditingProduct(null); setForm({name:'', price:'', cost:'', categoryId:1}); setShowProductModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มสินค้า</button>
                                             </div>
+                                            <div className="grid gap-3">
+                                                {products.map(p => (
+                                                    <div key={p.id} className="flex justify-between items-center p-5 bg-slate-50 rounded-3xl border">
+                                                        <span className="font-bold text-lg">{p.name}</span>
+                                                        <div className="flex items-center gap-4">
+                                                            <span className="text-blue-600 font-bold">{p.price}฿</span>
+                                                            <button onClick={() => {setEditingProduct(p); setForm(p); setShowProductModal(true);}} className="text-teal font-bold bg-teal-50 px-4 py-1 rounded-lg">แก้ไข</button>
+                                                            <button onClick={async () => {if(confirm('ลบ?')) {await db.products.delete(p.id); refreshData();}}} className="text-red-400">ลบ</button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                    {adminTab === 'categories' && (
+                                        <div className="space-y-4">
+                                            <button onClick={handleAddCategory} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มหมวดหมู่</button>
+                                            {categories.map(c => (
+                                                <div key={c.id} className="p-4 border rounded-2xl flex justify-between">
+                                                    <span>{c.name}</span>
+                                                    <button onClick={async () => {await db.categories.delete(c.id); refreshData();}} className="text-red-400">ลบ</button>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    )}
+                                    {adminTab === 'modifiers' && (
+                                        <div className="space-y-4">
+                                            <button onClick={handleAddModifier} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มกลุ่มตัวเลือก</button>
+                                            {modifiers.map(m => (
+                                                <div key={m.id} className="p-4 border rounded-2xl">
+                                                    <div className="flex justify-between font-bold mb-2">
+                                                        <span>{m.name}</span>
+                                                        <button onClick={async () => {await db.modifierGroups.delete(m.id); refreshData();}} className="text-red-400">ลบ</button>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {m.options.map((o, i) => <span key={i} className="bg-slate-100 px-2 py-1 rounded-lg text-xs">{o.name} (+{o.price})</span>)}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -245,7 +291,7 @@
                         PART 6: MODALS
                     ========================================== */}
                     
-                    {/* MODAL: IMAGE 5 (เลือกสินค้า) */}
+                    {/* MODAL: IMAGE 5 (Ordering) */}
                     {selectedItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
@@ -275,7 +321,7 @@
                                             <span className="text-red-500">{currentItemTotal} บาท</span>
                                         </div>
                                     </div>
-                                    <div className="w-full md:w-[400px] p-8 bg-slate-50/30 space-y-8">
+                                    <div className="w-full md:w-[400px] p-8 bg-slate-50/30 space-y-8 overflow-y-auto max-h-[400px]">
                                         <div>
                                             <p className="font-bold mb-4">ไซส์ <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">จำเป็น</span></p>
                                             <div className="grid grid-cols-3 gap-2">
@@ -287,29 +333,24 @@
                                                 ))}
                                             </div>
                                         </div>
-                                        <div>
-                                            <p className="font-bold mb-4 text-slate-700">ตัวเลือกเพิ่มเติม</p>
-                                            <div className="space-y-4">
-                                                {modifiers.map(group => (
-                                                    <div key={group.id}>
-                                                        <p className="text-xs font-bold text-slate-400 mb-2 uppercase">{group.name}</p>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {group.options.map((opt, idx) => {
-                                                                const isSel = activeToppings.find(x => x.name === opt.name && x.groupId === group.id);
-                                                                return (
-                                                                    <button key={idx} onClick={() => {
-                                                                        const next = isSel ? activeToppings.filter(x => !(x.name === opt.name && x.groupId === group.id)) : [...activeToppings, {...opt, groupId: group.id}];
-                                                                        setActiveToppings(next);
-                                                                    }} className={`px-4 py-2 rounded-full border-2 text-sm transition-all ${isSel?'border-teal-500 bg-teal-50 text-teal-600 font-bold':'bg-white border-slate-100 text-slate-400'}`}>
-                                                                        {opt.name} {opt.price > 0 ? `+${opt.price}` : ''}
-                                                                    </button>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                        {modifiers.map(group => (
+                                            <div key={group.id}>
+                                                <p className="font-bold mb-4">{group.name}</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {group.options.map((opt, idx) => {
+                                                        const isSel = activeToppings.find(x => x.name === opt.name && x.groupId === group.id);
+                                                        return (
+                                                            <button key={idx} onClick={() => {
+                                                                const next = isSel ? activeToppings.filter(x => !(x.name === opt.name && x.groupId === group.id)) : [...activeToppings, {...opt, groupId: group.id}];
+                                                                setActiveToppings(next);
+                                                            }} className={`px-4 py-2 rounded-full border-2 text-sm transition-all ${isSel?'border-teal-500 bg-teal-50 text-teal-600 font-bold':'bg-white border-slate-100 text-slate-400'}`}>
+                                                                {opt.name} {opt.price > 0 ? `+${opt.price}` : ''}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        </div>
+                                        ))}
                                     </div>
                                 </div>
                                 <div className="p-6 bg-white border-t">
@@ -319,7 +360,7 @@
                         </div>
                     )}
 
-                    {/* MODAL: IMAGE 7 (เพิ่ม/แก้ไขสินค้า) */}
+                    {/* MODAL: IMAGE 7 (Add/Edit) */}
                     {showProductModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
@@ -352,46 +393,27 @@
                                             </button>
                                             {openSection === 'category' && (
                                                 <div className="p-4 bg-slate-50 flex flex-wrap gap-2 border-t">
-                                                    <button onClick={handleAddCategory} className="border-2 border-dashed border-teal-500 text-teal-600 px-4 py-2 rounded-full text-sm font-bold active-scale">+ เพิ่มหมวด</button>
                                                     {categories.map(c => (
-                                                        <div key={c.id} className="relative group">
-                                                            <button onClick={() => setForm({...form, categoryId: c.id})}
-                                                                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${form.categoryId===c.id?'btn-teal text-white':'bg-white text-slate-400 border'}`}>
-                                                                {c.name}
-                                                            </button>
-                                                            <button onClick={() => handleDeleteCategory(c.id)} className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 rounded-full text-[8px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">✕</button>
-                                                        </div>
+                                                        <button key={c.id} onClick={() => setForm({...form, categoryId: c.id})}
+                                                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${form.categoryId===c.id?'btn-teal text-white':'bg-white text-slate-400 border'}`}>
+                                                            {c.name}
+                                                        </button>
                                                     ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="border rounded-2xl overflow-hidden">
-                                            <button onClick={() => setOpenSection(openSection==='modifiers'?'':'modifiers')} className="w-full p-4 flex justify-between items-center bg-white">
-                                                <div className="flex items-center gap-3 text-teal-600 font-bold">📑 ตัวเลือกสินค้า <span className="text-xs font-normal text-slate-400 ml-2">· {modifiers.length} กลุ่ม</span></div>
-                                                <span>{openSection==='modifiers'?'▲':'▼'}</span>
-                                            </button>
-                                            {openSection === 'modifiers' && (
-                                                <div className="p-4 bg-slate-50 space-y-3 border-t">
-                                                    {modifiers.map(m => (
-                                                        <div key={m.id} className="bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm">
-                                                            <div><p className="font-bold text-slate-700">{m.name}</p><p className="text-[10px] text-slate-400">{m.options.map(opt => `${opt.name} (+${opt.price})`).join(', ')}</p></div>
-                                                            <button onClick={() => handleDeleteModifierGroup(m.id)} className="text-red-400 text-xs">ลบ</button>
-                                                        </div>
-                                                    ))}
-                                                    <button onClick={handleAddModifierGroup} className="w-full border-2 border-dashed border-teal-500 text-teal-600 py-3 rounded-2xl text-sm font-bold active-scale">+ เพิ่มกลุ่มตัวเลือก</button>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="p-6">
-                                    <button onClick={handleSaveProduct} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale flex items-center justify-center gap-3 shadow-lg">💾 บันทึก</button>
+                                    <button onClick={handleSaveProduct} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale flex items-center justify-center gap-3 shadow-lg">
+                                        💾 บันทึก
+                                    </button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL: IMAGE 4 (ชำระเงิน) */}
+                    {/* MODAL: IMAGE 4 (Payment) */}
                     {showPayment && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col">
