@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Payment Master Edition</title>
+    <title>Lue cha POS | Final Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -15,10 +15,8 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .active-scale:active { transform: scale(0.95); transition: 0.1s; }
         .luecha-blue { background-color: #003399; }
-        .luecha-blue-text { color: #003399; }
         .luecha-orange { background-color: #FF6600; }
-        .luecha-orange-text { color: #FF6600; }
-        .bg-luecha-light { background-color: #f0f4ff; }
+        .teal-theme { background-color: #2497a9; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -27,14 +25,23 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 1. Database Schema (Master DB) ---
-        const db = new Dexie("LueCha_Master_DB");
-        db.version(3).stores({
+        // --- 1. Database Setup (Fixed Schema) ---
+        const db = new Dexie("LueCha_Final_DB");
+        db.version(1).stores({
             products: "++id, name, price, cost, category",
             ingredients: "++id, name, unit, stock, minStock",
-            orders: "++id, total, timestamp, staff, paymentMethod",
-            auditLogs: "++id, timestamp, action, staff"
+            orders: "++id, total, timestamp, staff, paymentMethod"
         });
+
+        // ข้อมูลเมนูคงที่จากรูปภาพ
+        const INITIAL_PRODUCTS = [
+            { name: "ชาไทย (Thai Tea)", price: 35, cost: 15, category: "เครื่องดื่ม" },
+            { name: "ชาเขียว (Green Tea)", price: 35, cost: 15, category: "เครื่องดื่ม" },
+            { name: "โกโก้ (Cocoa)", price: 35, cost: 18, category: "เครื่องดื่ม" },
+            { name: "นมสด (Fresh Milk)", price: 35, cost: 12, category: "เครื่องดื่ม" },
+            { name: "ชาไทยดับเบิ้ลชีส", price: 69, cost: 30, category: "Special" },
+            { name: "โกโก้ช็อกขูด", price: 50, cost: 25, category: "Special" }
+        ];
 
         const TOPPINGS = [
             { name: "ครีมชีส", price: 20 }, { name: "ชีสขูด", price: 20 },
@@ -48,19 +55,29 @@
             const [products, setProducts] = useState([]);
             const [ingredients, setIngredients] = useState([]);
             const [orders, setOrders] = useState([]);
-            const [selectedItem, setSelectedItem] = useState(null);
-            const [showAddModal, setShowAddModal] = useState(false);
             
-            // Payment States
+            // UI States
+            const [selectedItem, setSelectedItem] = useState(null);
             const [showPayment, setShowPayment] = useState(false);
-            const [paymentMethod, setPaymentMethod] = useState('cash'); // cash, transfer, delivery
+            const [showAddProduct, setShowAddProduct] = useState(false);
+            const [showAddIngredient, setShowAddIngredient] = useState(false);
+
+            // Payment States
+            const [paymentMethod, setPaymentMethod] = useState('cash');
             const [cashReceived, setCashReceived] = useState(0);
             const [queueNumber, setQueueNumber] = useState(1);
-            const [showSuccess, setShowSuccess] = useState(false);
 
-            const [formData, setFormData] = useState({ name: '', price: '', cost: '', category: 'เครื่องดื่ม' });
+            // Form States
+            const [newProd, setNewProd] = useState({ name: '', price: '', cost: '', category: 'เครื่องดื่ม' });
+            const [newIng, setNewIng] = useState({ name: '', unit: 'กรัม', stock: '', minStock: '' });
 
-            useEffect(() => { refreshData(); }, []);
+            useEffect(() => {
+                const init = async () => {
+                    if (await db.products.count() === 0) await db.products.bulkAdd(INITIAL_PRODUCTS);
+                    refreshData();
+                };
+                init();
+            }, []);
 
             const refreshData = async () => {
                 setProducts(await db.products.toArray());
@@ -68,70 +85,83 @@
                 setOrders(await db.orders.toArray());
             };
 
-            const totalAmount = useMemo(() => cart.reduce((s, i) => s + i.price, 0), [cart]);
-            const changeAmount = useMemo(() => Math.max(0, cashReceived - totalAmount), [cashReceived, totalAmount]);
+            // --- Math Logic (Fixed) ---
+            const totalAmount = useMemo(() => {
+                return cart.reduce((sum, item) => Number(sum) + Number(item.price), 0);
+            }, [cart]);
 
-            const handleQuickCash = (amount) => {
-                if (amount === 'exact') setCashReceived(totalAmount);
-                else setCashReceived(prev => prev + amount);
+            const changeAmount = useMemo(() => {
+                const change = Number(cashReceived) - Number(totalAmount);
+                return change > 0 ? change : 0;
+            }, [cashReceived, totalAmount]);
+
+            const handleQuickCash = (val) => {
+                if (val === 'exact') setCashReceived(Number(totalAmount));
+                else setCashReceived(prev => Number(prev) + Number(val));
+            };
+
+            // --- Actions ---
+            const addToCart = (product, size, toppings) => {
+                let price = Number(product.price);
+                if (size === 'M') price += 5;
+                if (size === 'L') price += 10;
+                const toppingPrice = toppings.reduce((s, t) => s + Number(t.price), 0);
+                
+                setCart([...cart, { 
+                    ...product, 
+                    cartId: Date.now(), 
+                    size, 
+                    toppings, 
+                    price: price + toppingPrice 
+                }]);
+                setSelectedItem(null);
             };
 
             const confirmPayment = async () => {
-                if (paymentMethod === 'cash' && cashReceived < totalAmount) {
-                    alert("ยอดเงินรับมาไม่เพียงพอ");
-                    return;
-                }
-                const orderData = {
+                if (paymentMethod === 'cash' && Number(cashReceived) < totalAmount) return alert("เงินรับมาไม่พอ");
+                await db.orders.add({
                     total: totalAmount,
                     timestamp: new Date(),
-                    staff: 'พนักงานบูธ',
-                    paymentMethod: paymentMethod,
+                    paymentMethod,
                     queue: queueNumber
-                };
-                await db.orders.add(orderData);
+                });
                 setQueueNumber(prev => prev + 1);
-                setShowSuccess(true);
-                setTimeout(() => {
-                    setShowSuccess(false);
-                    setShowPayment(false);
-                    setCart([]);
-                    setCashReceived(0);
-                    refreshData();
-                }, 2000);
+                setCart([]);
+                setCashReceived(0);
+                setShowPayment(false);
+                refreshData();
+                alert("ชำระเงินสำเร็จ!");
             };
 
             return (
-                <div className="h-screen flex flex-col overflow-hidden">
+                <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
                     {/* Header */}
                     <header className="luecha-blue p-4 text-white flex justify-between items-center shadow-lg z-10">
-                        <div className="flex items-center gap-3">
-                            <span className="font-bold text-xl tracking-tight">เลื่องชื่อลือชา POS</span>
-                        </div>
+                        <h1 className="font-bold text-xl">เลื่องชื่อลือชา POS</h1>
                         <div className="flex gap-2">
-                            <button onClick={() => setView('pos')} className={`px-4 py-1 rounded-full text-sm transition-all ${view==='pos'?'luecha-orange shadow-inner':'opacity-50'}`}>หน้าขาย</button>
-                            <button onClick={() => setView('admin')} className={`px-4 py-1 rounded-full text-sm transition-all ${view==='admin'?'luecha-orange shadow-inner':'opacity-50'}`}>จัดการร้าน</button>
-                            <button onClick={() => setView('report')} className={`px-4 py-1 rounded-full text-sm transition-all ${view==='report'?'luecha-orange shadow-inner':'opacity-50'}`}>รายงาน</button>
+                            <button onClick={() => setView('pos')} className={`px-4 py-1 rounded-full text-sm ${view==='pos'?'luecha-orange':'opacity-50'}`}>หน้าขาย</button>
+                            <button onClick={() => setView('admin')} className={`px-4 py-1 rounded-full text-sm ${view==='admin'?'luecha-orange':'opacity-50'}`}>สต็อก/จัดการ</button>
+                            <button onClick={() => setView('report')} className={`px-4 py-1 rounded-full text-sm ${view==='report'?'luecha-orange':'opacity-50'}`}>รายงาน</button>
                         </div>
                     </header>
 
-                    {/* VIEW: POS */}
                     {view === 'pos' && (
                         <div className="flex-1 flex overflow-hidden">
-                            <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar bg-slate-100">
+                            <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar">
                                 {products.map(p => (
-                                    <button key={p.id} onClick={() => setSelectedItem({...p, currentSize: 'S', selectedToppings: []})}
-                                        className="bg-white p-4 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-44 border-2 border-transparent hover:border-orange-500 transition-all">
-                                        <span className="font-bold text-slate-800 text-center mb-2">{p.name}</span>
-                                        <span className="luecha-blue-text font-black text-2xl">{p.price}฿</span>
+                                    <button key={p.id} onClick={() => setSelectedItem({...p, size:'S', toppings:[]})}
+                                        className="bg-white p-4 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-40 border-2 border-transparent hover:border-orange-500">
+                                        <span className="font-bold text-slate-800">{p.name}</span>
+                                        <span className="text-blue-700 font-black text-xl">{p.price}฿</span>
                                     </button>
                                 ))}
                             </div>
                             <div className="w-80 md:w-96 bg-white shadow-2xl flex flex-col">
-                                <div className="p-6 border-b font-bold text-lg text-slate-700">ออเดอร์ปัจจุบัน</div>
+                                <div className="p-6 border-b font-bold text-lg">ตะกร้าสินค้า</div>
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                     {cart.map(item => (
-                                        <div key={item.cartId} className="bg-slate-50 p-4 rounded-2xl relative">
-                                            <div className="flex justify-between font-bold text-slate-800">
+                                        <div key={item.cartId} className="bg-slate-50 p-3 rounded-2xl relative">
+                                            <div className="flex justify-between font-bold">
                                                 <span>{item.name} ({item.size})</span>
                                                 <span>{item.price}฿</span>
                                             </div>
@@ -140,173 +170,144 @@
                                     ))}
                                 </div>
                                 <div className="p-6 bg-slate-50 border-t space-y-4">
-                                    <div className="flex justify-between text-3xl font-black luecha-blue-text">
+                                    <div className="flex justify-between text-3xl font-black text-blue-900">
                                         <span>รวม</span>
                                         <span>{totalAmount}฿</span>
                                     </div>
-                                    <button onClick={() => setShowPayment(true)} disabled={cart.length===0} 
-                                        className="w-full luecha-orange text-white py-5 rounded-3xl font-bold text-xl shadow-lg active-scale disabled:opacity-30">
-                                        ชำระเงิน
-                                    </button>
+                                    <button onClick={() => setShowPayment(true)} disabled={cart.length===0} className="w-full luecha-orange text-white py-5 rounded-3xl font-bold text-xl active-scale disabled:opacity-30">ชำระเงิน</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* VIEW: ADMIN & REPORT (คงเดิมตาม Master) */}
                     {view === 'admin' && (
                         <div className="flex-1 p-8 overflow-y-auto bg-white">
-                            <div className="max-w-5xl mx-auto space-y-8">
+                            <div className="max-w-5xl mx-auto space-y-10">
                                 <div className="flex justify-between items-center">
-                                    <h2 className="text-3xl font-bold text-slate-800">จัดการร้านค้า</h2>
-                                    <button onClick={() => setShowAddModal(true)} className="luecha-blue text-white px-8 py-3 rounded-2xl font-bold active-scale shadow-lg">+ เพิ่มสินค้า</button>
+                                    <h2 className="text-3xl font-bold">จัดการระบบ</h2>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setShowAddIngredient(true)} className="bg-slate-800 text-white px-6 py-2 rounded-xl text-sm">+ เพิ่มสต็อก</button>
+                                        <button onClick={() => setShowAddProduct(true)} className="teal-theme text-white px-6 py-2 rounded-xl text-sm">+ เพิ่มสินค้า</button>
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {ingredients.map(ing => (
-                                        <div key={ing.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                                            <p className="text-slate-500 text-sm">{ing.name}</p>
-                                            <p className={`text-3xl font-black ${ing.stock <= ing.minStock ? 'text-red-500' : 'text-slate-800'}`}>{ing.stock} {ing.unit}</p>
-                                        </div>
-                                    ))}
-                                </div>
+                                
+                                <section>
+                                    <h3 className="font-bold text-slate-400 mb-4 uppercase">คลังวัตถุดิบ</h3>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        {ingredients.map(ing => (
+                                            <div key={ing.id} className="bg-slate-50 p-6 rounded-3xl border">
+                                                <p className="text-sm text-slate-500">{ing.name}</p>
+                                                <p className="text-2xl font-black">{ing.stock} {ing.unit}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="font-bold text-slate-400 mb-4 uppercase">รายการสินค้า</h3>
+                                    <div className="grid gap-2">
+                                        {products.map(p => (
+                                            <div key={p.id} className="flex justify-between p-4 border rounded-2xl">
+                                                <span className="font-bold">{p.name}</span>
+                                                <span className="text-blue-600 font-bold">{p.price}฿</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
                             </div>
                         </div>
                     )}
 
-                    {/* --- NEW PAYMENT MODAL (ตามรูปที่คุณส่งมา) --- */}
+                    {/* --- PAYMENT MODAL (Fixed Math & UI) --- */}
                     {showPayment && (
                         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-                            <div className="bg-white w-full max-w-4xl rounded-[2rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-                                {/* Header */}
-                                <div className="flex justify-between items-center p-4 border-b">
-                                    <div className="flex items-center gap-2 font-bold text-slate-700">
-                                        <span>ชำระเงิน</span>
-                                        <div className="w-5 h-5 rounded-full border border-slate-300 flex items-center justify-center text-[10px]">i</div>
-                                    </div>
-                                    <button onClick={() => {setShowPayment(false); setCashReceived(0);}} className="text-slate-400 text-2xl">✕</button>
+                            <div className="bg-white w-full max-w-4xl rounded-[2rem] overflow-hidden shadow-2xl flex flex-col">
+                                <div className="p-4 border-b flex justify-between items-center">
+                                    <span className="font-bold">ชำระเงิน</span>
+                                    <button onClick={() => {setShowPayment(false); setCashReceived(0);}} className="text-2xl">✕</button>
                                 </div>
-
-                                <div className="flex flex-col md:flex-row">
-                                    {/* Left Side: Summary & Methods */}
-                                    <div className="flex-1 p-6 border-r border-slate-100 space-y-6">
-                                        <div className="luecha-blue rounded-3xl p-8 text-center text-white shadow-inner">
-                                            <p className="text-sm opacity-80 mb-1">ยอดรวม</p>
+                                <div className="flex flex-col md:flex-row flex-1 overflow-y-auto">
+                                    <div className="flex-1 p-6 space-y-6 border-r">
+                                        <div className="luecha-blue text-white p-8 rounded-3xl text-center">
+                                            <p className="text-sm opacity-70">ยอดรวม</p>
                                             <p className="text-6xl font-black">{totalAmount}</p>
                                         </div>
-
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <button onClick={() => setPaymentMethod('cash')} className={`flex flex-col items-center p-4 rounded-3xl border-2 transition-all ${paymentMethod==='cash'?'border-blue-500 bg-blue-50':'border-slate-100'}`}>
-                                                <div className={`w-6 h-6 rounded-full mb-2 flex items-center justify-center ${paymentMethod==='cash'?'bg-green-500 text-white':'border border-slate-300'}`}>{paymentMethod==='cash'&&'✓'}</div>
-                                                <span className="text-2xl mb-1">💵</span>
-                                                <span className="text-xs font-bold">เงินสด</span>
-                                            </button>
-                                            <button onClick={() => setPaymentMethod('transfer')} className={`flex flex-col items-center p-4 rounded-3xl border-2 transition-all ${paymentMethod==='transfer'?'border-blue-500 bg-blue-50':'border-slate-100'}`}>
-                                                <div className={`w-6 h-6 rounded-full mb-2 flex items-center justify-center ${paymentMethod==='transfer'?'bg-green-500 text-white':'border border-slate-300'}`}>{paymentMethod==='transfer'&&'✓'}</div>
-                                                <span className="text-2xl mb-1">📲</span>
-                                                <span className="text-xs font-bold">โอนเงิน</span>
-                                            </button>
-                                            <button onClick={() => setPaymentMethod('delivery')} className={`flex flex-col items-center p-4 rounded-3xl border-2 transition-all ${paymentMethod==='delivery'?'border-blue-500 bg-blue-50':'border-slate-100'}`}>
-                                                <div className={`w-6 h-6 rounded-full mb-2 flex items-center justify-center ${paymentMethod==='delivery'?'bg-green-500 text-white':'border border-slate-300'}`}>{paymentMethod==='delivery'&&'✓'}</div>
-                                                <span className="text-2xl mb-1">🛵</span>
-                                                <span className="text-xs font-bold">เดลิเวอรี่</span>
-                                            </button>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['cash', 'transfer', 'delivery'].map(m => (
+                                                <button key={m} onClick={() => setPaymentMethod(m)} className={`p-4 rounded-2xl border-2 ${paymentMethod===m?'border-blue-500 bg-blue-50':'border-slate-100'}`}>
+                                                    <p className="text-xs font-bold uppercase">{m}</p>
+                                                </button>
+                                            ))}
                                         </div>
-
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border-2 border-blue-100">
-                                                <span className="text-slate-400">💸 รับมา</span>
-                                                <input type="number" className="flex-1 bg-transparent text-3xl font-black text-right outline-none luecha-blue-text" 
-                                                    value={cashReceived || ''} onChange={e => setCashReceived(parseFloat(e.target.value) || 0)} placeholder="กรอกที่นี่" />
-                                                <span className="text-slate-400">บาท</span>
+                                        <div className="space-y-2">
+                                            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-blue-100 flex justify-between items-center">
+                                                <span className="text-slate-400">รับมา</span>
+                                                <input type="number" className="bg-transparent text-3xl font-black text-right outline-none w-1/2" 
+                                                    value={cashReceived || ''} onChange={e => setCashReceived(Number(e.target.value))} />
                                             </div>
-                                            <div className="flex justify-between items-center px-4">
-                                                <div className="flex items-center gap-2 text-slate-500">
-                                                    <span>🔗 ทอน</span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className="text-4xl font-black text-red-500">{changeAmount}</span>
-                                                    <span className="ml-2 text-slate-400">บาท</span>
-                                                </div>
+                                            <div className="flex justify-between p-4">
+                                                <span className="text-slate-400">เงินทอน</span>
+                                                <span className="text-4xl font-black text-red-500">{changeAmount}</span>
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Right Side: Quick Cash Buttons */}
-                                    <div className="w-full md:w-[400px] p-6 bg-slate-50/50">
-                                        <div className="flex justify-between text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">
-                                            <span>รับเงินด่วน</span>
-                                            <span>กดซ้ำเพื่อเพิ่มจำนวน</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <button onClick={() => handleQuickCash('exact')} className="h-20 rounded-2xl bg-green-100 text-green-700 font-bold border-2 border-green-200 active-scale">พอดี</button>
-                                            {[1, 5, 10, 20, 50, 100, 500, 1000].map(val => (
-                                                <button key={val} onClick={() => handleQuickCash(val)} className="h-20 rounded-2xl bg-white shadow-sm border border-slate-200 font-bold text-xl text-slate-700 active-scale hover:bg-white transition-all">
-                                                    {val}
-                                                </button>
+                                    <div className="w-full md:w-96 p-6 bg-slate-50">
+                                        <p className="text-xs font-bold text-slate-400 mb-4">รับเงินด่วน</p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button onClick={() => handleQuickCash('exact')} className="h-16 bg-green-100 text-green-700 font-bold rounded-xl">พอดี</button>
+                                            {[20, 50, 100, 500, 1000].map(v => (
+                                                <button key={v} onClick={() => handleQuickCash(v)} className="h-16 bg-white border rounded-xl font-bold">{v}</button>
                                             ))}
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* Footer Confirm Button */}
-                                <div className="p-4 bg-white border-t">
-                                    <button onClick={confirmPayment} className="w-full luecha-orange text-white py-6 rounded-2xl font-bold text-2xl shadow-lg active-scale flex items-center justify-center gap-3">
-                                        {showSuccess ? '✓ ชำระเงินสำเร็จ' : 'ยืนยันชำระเงิน'}
-                                    </button>
+                                <div className="p-4 border-t">
+                                    <button onClick={confirmPayment} className="w-full luecha-orange text-white py-5 rounded-2xl font-bold text-xl active-scale">ยืนยันชำระเงิน</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL: Success Queue (Overlay) */}
-                    {showSuccess && (
-                        <div className="fixed inset-0 bg-emerald-600 flex flex-col items-center justify-center z-[100] text-white animate-in fade-in duration-300">
-                            <div className="text-[12rem] font-black leading-none mb-4">{queueNumber - 1}</div>
-                            <h2 className="text-4xl font-bold">คิวของคุณ</h2>
-                            <p className="mt-4 opacity-80">กำลังบันทึกข้อมูล...</p>
+                    {/* --- ADD PRODUCT MODAL --- */}
+                    {showAddProduct && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
+                            <div className="bg-white w-full max-w-md rounded-3xl p-8">
+                                <h2 className="text-2xl font-bold mb-6">เพิ่มสินค้าใหม่</h2>
+                                <div className="space-y-4">
+                                    <input type="text" placeholder="ชื่อสินค้า" className="w-full p-4 bg-slate-50 rounded-2xl outline-none" onChange={e => setNewProd({...newProd, name: e.target.value})} />
+                                    <input type="number" placeholder="ราคาขาย" className="w-full p-4 bg-slate-50 rounded-2xl outline-none" onChange={e => setNewProd({...newProd, price: Number(e.target.value)})} />
+                                    <input type="number" placeholder="ต้นทุน" className="w-full p-4 bg-slate-50 rounded-2xl outline-none" onChange={e => setNewProd({...newProd, cost: Number(e.target.value)})} />
+                                    <button onClick={async () => {
+                                        await db.products.add(newProd);
+                                        setShowAddProduct(false);
+                                        refreshData();
+                                    }} className="w-full teal-theme text-white py-4 rounded-2xl font-bold">บันทึกสินค้า</button>
+                                    <button onClick={() => setShowAddProduct(false)} className="w-full text-slate-400">ยกเลิก</button>
+                                </div>
+                            </div>
                         </div>
                     )}
 
-                    {/* MODAL: Size/Topping (คงเดิม) */}
+                    {/* --- MODAL: SIZE & TOPPING --- */}
                     {selectedItem && (
-                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-4">
-                            <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl">
-                                <div className="p-6 border-b flex justify-between items-center">
-                                    <h3 className="text-xl font-bold text-slate-800">{selectedItem.name}</h3>
-                                    <button onClick={() => setSelectedItem(null)} className="text-slate-400">ปิด</button>
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+                            <div className="bg-white w-full max-w-md rounded-3xl p-8">
+                                <h3 className="text-xl font-bold mb-6">{selectedItem.name}</h3>
+                                <div className="grid grid-cols-3 gap-2 mb-6">
+                                    {['S', 'M', 'L'].map(s => (
+                                        <button key={s} onClick={() => setSelectedItem({...selectedItem, size: s})} className={`py-3 rounded-xl border-2 ${selectedItem.size===s?'border-orange-500 bg-orange-50':'border-slate-100'}`}>{s}</button>
+                                    ))}
                                 </div>
-                                <div className="p-6 space-y-6">
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {['S', 'M', 'L'].map(size => (
-                                            <button key={size} onClick={() => setSelectedItem({...selectedItem, currentSize: size})}
-                                                className={`py-4 rounded-2xl font-bold border-2 transition-all ${selectedItem.currentSize === size ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-slate-100 text-slate-400'}`}>
-                                                {size}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {TOPPINGS.map(t => {
-                                            const isSelected = (selectedItem.selectedToppings || []).find(st => st.name === t.name);
-                                            return (
-                                                <button key={t.name} onClick={() => {
-                                                    const current = selectedItem.selectedToppings || [];
-                                                    const next = isSelected ? current.filter(st => st.name !== t.name) : [...current, t];
-                                                    setSelectedItem({...selectedItem, selectedToppings: next});
-                                                }} className={`p-3 rounded-xl text-sm border-2 transition-all ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-50 text-slate-500'}`}>
-                                                    {t.name} (+{t.price})
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                <div className="grid grid-cols-2 gap-2 mb-8">
+                                    {TOPPINGS.map(t => (
+                                        <button key={t.name} onClick={() => {
+                                            const has = selectedItem.toppings.find(x => x.name === t.name);
+                                            const next = has ? selectedItem.toppings.filter(x => x.name !== t.name) : [...selectedItem.toppings, t];
+                                            setSelectedItem({...selectedItem, toppings: next});
+                                        }} className={`p-3 rounded-xl border text-sm ${selectedItem.toppings.find(x=>x.name===t.name)?'bg-blue-50 border-blue-500 text-blue-700':''}`}>{t.name} (+{t.price})</button>
+                                    ))}
                                 </div>
-                                <div className="p-6 bg-slate-50">
-                                    <button onClick={() => {
-                                        const toppingTotal = (selectedItem.selectedToppings || []).reduce((s,t)=>s+t.price,0);
-                                        const sizePrice = selectedItem.currentSize === 'M' ? selectedItem.price + 5 : selectedItem.currentSize === 'L' ? selectedItem.price + 10 : selectedItem.price;
-                                        setCart([...cart, {...selectedItem, cartId: Date.now(), size: selectedItem.currentSize, price: sizePrice + toppingTotal}]);
-                                        setSelectedItem(null);
-                                    }} className="w-full luecha-orange text-white py-5 rounded-[1.5rem] font-bold text-xl active-scale">เพิ่มลงตะกร้า</button>
-                                </div>
+                                <button onClick={() => addToCart(selectedItem, selectedItem.size, selectedItem.toppings)} className="w-full luecha-orange text-white py-4 rounded-2xl font-bold">เพิ่มลงตะกร้า</button>
                             </div>
                         </div>
                     )}
