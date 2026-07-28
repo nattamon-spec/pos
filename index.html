@@ -323,7 +323,7 @@
                         </div>
                     )}
 
-                    {/* MODAL: IMAGE 7 (เพิ่ม/แก้ไขสินค้า) */}
+                   {/* MODAL: IMAGE 7 (เพิ่ม/แก้ไขสินค้า) */}
                     {showProductModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
@@ -348,7 +348,9 @@
                                             </div>
                                         </div>
                                     </div>
+                                    
                                     <div className="space-y-3">
+                                        {/* ส่วนที่ 1: หมวดหมู่ */}
                                         <div className="border rounded-2xl overflow-hidden">
                                             <button onClick={() => setOpenSection(openSection==='category'?'':'category')} className="w-full p-4 flex justify-between items-center bg-white">
                                                 <div className="flex items-center gap-3 text-teal-600 font-bold">🏷️ หมวดหมู่</div>
@@ -366,6 +368,35 @@
                                                             <button onClick={() => handleDeleteCategory(c.id)} className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 rounded-full text-[8px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">✕</button>
                                                         </div>
                                                     ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* ส่วนที่ 2: ตัวเลือกสินค้า (Modifiers) - เพิ่มใหม่ */}
+                                        <div className="border rounded-2xl overflow-hidden">
+                                            <button onClick={() => setOpenSection(openSection==='modifiers'?'':'modifiers')} className="w-full p-4 flex justify-between items-center bg-white">
+                                                <div className="flex items-center gap-3 text-teal-600 font-bold">
+                                                    📑 ตัวเลือกสินค้า 
+                                                    <span className="text-xs font-normal text-slate-400 ml-2">· {modifiers.length} กลุ่ม</span>
+                                                </div>
+                                                <span>{openSection==='modifiers'?'▲':'▼'}</span>
+                                            </button>
+                                            {openSection === 'modifiers' && (
+                                                <div className="p-4 bg-slate-50 space-y-3 border-t">
+                                                    {modifiers.map(m => (
+                                                        <div key={m.id} className="bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm">
+                                                            <div>
+                                                                <p className="font-bold text-slate-700">{m.name}</p>
+                                                                <p className="text-[10px] text-slate-400">
+                                                                    {m.options.map(opt => `${opt.name} (+${opt.price})`).join(', ')}
+                                                                </p>
+                                                            </div>
+                                                            <button onClick={() => handleDeleteModifierGroup(m.id)} className="text-red-400 text-xs hover:bg-red-50 px-2 py-1 rounded-lg">ลบ</button>
+                                                        </div>
+                                                    ))}
+                                                    <button onClick={handleAddModifierGroup} className="w-full border-2 border-dashed border-teal-500 text-teal-600 py-3 rounded-2xl text-sm font-bold active-scale">
+                                                        + เพิ่มกลุ่มตัวเลือก
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>
