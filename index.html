@@ -3,193 +3,293 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS - Add Product UI</title>
+    <title>Lue cha POS Master | ระบบจัดการร้านค้าเต็มรูปแบบ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Kanit', sans-serif; background-color: #f8fafc; }
-        .input-field { @apply w-full border border-gray-300 rounded-xl p-3 mt-1 focus:ring-2 focus:ring-teal-500 outline-none transition-all; }
-        .menu-item-row { @apply flex items-center justify-between p-4 border border-gray-200 rounded-2xl mb-3 bg-white active:bg-gray-50 cursor-pointer; }
+        body { font-family: 'Kanit', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .active-scale:active { transform: scale(0.98); transition: 0.1s; }
+        .teal-theme { background-color: #2497a9; }
+        .teal-text { color: #2497a9; }
     </style>
 </head>
-<body>
+<body class="bg-slate-50">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
 
-        // --- Database Setup ---
-        const db = new Dexie("LueCha_v4");
+        // --- 1. Database Schema (Master Version) ---
+        const db = new Dexie("LueCha_Master_DB");
         db.version(1).stores({
-            products: "++id, name, price, cost, deliveryPrice, categoryId"
+            products: "++id, name, price, cost, deliveryPrice, category",
+            ingredients: "++id, name, unit, stock, minStock",
+            recipes: "++id, productId, ingredientId, amount",
+            orders: "++id, total, timestamp, staff, paymentMethod",
+            modifierGroups: "++id, name, options"
         });
 
         function App() {
-            const [showModal, setShowModal] = useState(true); // เปิดไว้เพื่อโชว์ UI ทันที
+            // --- States ---
+            const [view, setView] = useState('pos'); 
+            const [user, setUser] = useState({ name: 'Admin', role: 'owner' });
+            const [products, setProducts] = useState([]);
+            const [ingredients, setIngredients] = useState([]);
+            const [orders, setOrders] = useState([]);
+            const [cart, setCart] = useState([]);
+            const [showAddModal, setShowAddModal] = useState(false);
+            const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+            // Form State สำหรับหน้าเพิ่มสินค้าใหม่
             const [formData, setFormData] = useState({
-                name: '',
-                price: '',
-                cost: '',
-                deliveryPrice: '',
-                category: 'ยังไม่ได้เลือก',
-                options: '1 กลุ่ม'
+                name: '', price: '', cost: '', deliveryPrice: '', category: 'เครื่องดื่ม'
             });
 
-            const handleSave = async () => {
-                if(!formData.name || !formData.price) return alert("กรุณากรอกข้อมูลที่จำเป็น (*)");
-                await db.products.add(formData);
-                alert("บันทึกสินค้าเรียบร้อย!");
-                // setShowModal(false);
+            // --- Effects ---
+            useEffect(() => {
+                const init = async () => {
+                    if (await db.ingredients.count() === 0) {
+                        await db.ingredients.bulkAdd([
+                            { name: "ผงชา", unit: "กรัม", stock: 1000, minStock: 200 },
+                            { name: "นมสด", unit: "มล.", stock: 5000, minStock: 1000 }
+                        ]);
+                    }
+                    refreshData();
+                };
+                init();
+                window.addEventListener('online', () => setIsOnline(true));
+                window.addEventListener('offline', () => setIsOnline(false));
+            }, []);
+
+            const refreshData = async () => {
+                setProducts(await db.products.toArray());
+                setIngredients(await db.ingredients.toArray());
+                setOrders(await db.orders.toArray());
             };
 
+            // --- Logic ---
+            const handleSaveProduct = async () => {
+                if(!formData.name || !formData.price) return alert("กรุณากรอกข้อมูลที่จำเป็น");
+                await db.products.add(formData);
+                setFormData({ name: '', price: '', cost: '', deliveryPrice: '', category: 'เครื่องดื่ม' });
+                setShowAddModal(false);
+                refreshData();
+            };
+
+            const handleCheckout = async (method) => {
+                const total = cart.reduce((s, i) => s + i.price, 0);
+                await db.orders.add({ total, timestamp: new Date(), staff: user.name, paymentMethod: method });
+                setCart([]);
+                refreshData();
+                alert("ชำระเงินสำเร็จ!");
+            };
+
+            // --- UI Components ---
+            const Nav = () => (
+                <nav className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-xl z-10">
+                    <div className="flex items-center gap-6">
+                        <span className="text-xl font-bold text-emerald-400">Lue cha POS</span>
+                        <div className="flex gap-2">
+                            {['pos', 'admin', 'report'].map(v => (
+                                <button key={v} onClick={() => setView(v)} 
+                                    className={`px-4 py-1 rounded-full text-sm transition-all ${view === v ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                                    {v === 'pos' ? 'หน้าขาย' : v === 'admin' ? 'จัดการร้าน' : 'รายงาน'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs">
+                        <span>{isOnline ? '🟢 Online' : '🟠 Offline'}</span>
+                        <span className="bg-slate-800 px-3 py-1 rounded-lg">{user.name}</span>
+                    </div>
+                </nav>
+            );
+
             return (
-                <div className="min-h-screen p-4 flex items-center justify-center">
-                    
-                    {/* ปุ่มจำลองการเปิด Modal */}
-                    {!showModal && (
-                        <button onClick={() => setShowModal(true)} className="bg-teal-600 text-white px-6 py-3 rounded-xl font-bold">
-                            + เพิ่มสินค้า
-                        </button>
+                <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
+                    <Nav />
+
+                    {/* VIEW: POS */}
+                    {view === 'pos' && (
+                        <div className="flex-1 flex overflow-hidden">
+                            <div className="flex-1 p-6 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar">
+                                {products.length === 0 && <div className="col-span-full text-center py-20 text-slate-400">ยังไม่มีสินค้า กรุณาเพิ่มสินค้าที่หน้าจัดการ</div>}
+                                {products.map(p => (
+                                    <button key={p.id} onClick={() => setCart([...cart, {...p, cartId: Date.now()}])}
+                                        className="bg-white p-6 rounded-[2.5rem] shadow-sm active-scale flex flex-col items-center justify-center h-44 border-2 border-transparent hover:border-emerald-500 transition-all">
+                                        <span className="font-bold text-slate-800 text-lg">{p.name}</span>
+                                        <span className="text-emerald-600 font-black text-2xl">{p.price}฿</span>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="w-96 bg-white shadow-2xl flex flex-col">
+                                <div className="p-6 border-b font-bold text-xl text-slate-700">รายการสั่งซื้อ</div>
+                                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                                    {cart.map(item => (
+                                        <div key={item.cartId} className="flex justify-between items-center animate-in slide-in-from-right-4">
+                                            <span className="text-slate-600">{item.name}</span>
+                                            <span className="font-bold text-slate-800">{item.price}฿</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="p-6 bg-slate-50 border-t space-y-4">
+                                    <div className="flex justify-between text-2xl font-black text-slate-800">
+                                        <span>รวมทั้งสิ้น</span>
+                                        <span className="text-emerald-600">{cart.reduce((s, i) => s + i.price, 0).toLocaleString()}฿</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => handleCheckout('qr')} disabled={cart.length===0} className="bg-blue-600 text-white py-4 rounded-2xl font-bold active-scale disabled:bg-slate-300">QR Code</button>
+                                        <button onClick={() => handleCheckout('cash')} disabled={cart.length===0} className="bg-emerald-600 text-white py-4 rounded-2xl font-bold active-scale disabled:bg-slate-300">เงินสด</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
-                    {/* --- Add Product Modal (ตามรูปที่คุณส่งมา) --- */}
-                    {showModal && (
-                        <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
-                            <div className="bg-white w-full max-w-lg rounded-t-[30px] md:rounded-[30px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
-                                
-                                {/* Header */}
-                                <div className="flex justify-between items-center p-5 border-b border-gray-100">
-                                    <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                                        <span className="text-teal-600">เพิ่มสินค้า</span>
-                                    </h2>
-                                    <div className="flex gap-3">
-                                        <button className="text-gray-400 hover:text-gray-600">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="Step 13" />
-                                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                                                <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                                            </svg>
-                                        </button>
-                                        <button onClick={() => setShowModal(false)} className="bg-red-100 text-red-500 p-1 rounded-full hover:bg-red-200 transition-colors">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
+                    {/* VIEW: ADMIN */}
+                    {view === 'admin' && (
+                        <div className="flex-1 p-8 overflow-y-auto">
+                            <div className="max-w-5xl mx-auto space-y-8">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-3xl font-bold text-slate-800">จัดการระบบ</h2>
+                                    <button onClick={() => setShowAddModal(true)} className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold active-scale shadow-lg shadow-emerald-100">
+                                        + เพิ่มสินค้าใหม่
+                                    </button>
                                 </div>
 
-                                {/* Body */}
-                                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
-                                    
-                                    {/* Top Section: Image & Basic Info */}
-                                    <div className="flex gap-6">
-                                        {/* Image Upload Placeholder */}
-                                        <div className="w-32 h-32 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-100 transition-all">
-                                            <span className="text-4xl font-bold text-teal-200">?</span>
-                                            <span className="text-xs mt-1">เลือกรูป</span>
+                                {/* Stock Summary */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {ingredients.map(ing => (
+                                        <div key={ing.id} className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                                            <p className="text-slate-400 text-sm">{ing.name}</p>
+                                            <p className={`text-2xl font-black ${ing.stock <= ing.minStock ? 'text-red-500' : 'text-slate-800'}`}>{ing.stock} {ing.unit}</p>
                                         </div>
+                                    ))}
+                                </div>
 
-                                        {/* Name, Price, Cost */}
+                                {/* Product List */}
+                                <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 text-slate-400 text-sm">
+                                            <tr>
+                                                <th className="p-6">ชื่อสินค้า</th>
+                                                <th className="p-6">ราคาขาย</th>
+                                                <th className="p-6">ต้นทุน</th>
+                                                <th className="p-6">กำไร/แก้ว</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {products.map(p => (
+                                                <tr key={p.id} className="border-b border-slate-50">
+                                                    <td className="p-6 font-medium text-slate-700">{p.name}</td>
+                                                    <td className="p-6 font-bold text-emerald-600">{p.price}฿</td>
+                                                    <td className="p-6 text-slate-400">{p.cost || 0}฿</td>
+                                                    <td className="p-6 text-blue-600 font-bold">{p.price - (p.cost || 0)}฿</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW: REPORT */}
+                    {view === 'report' && (
+                        <div className="flex-1 p-8 overflow-y-auto">
+                            <div className="max-w-4xl mx-auto">
+                                <h2 className="text-3xl font-bold mb-8 text-slate-800">รายงานยอดขาย</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                    <div className="bg-emerald-600 text-white p-8 rounded-[2.5rem] shadow-xl shadow-emerald-100">
+                                        <p className="opacity-80 mb-1 font-light">ยอดขายรวมวันนี้</p>
+                                        <p className="text-5xl font-black">{orders.reduce((s, o) => s + o.total, 0).toLocaleString()}฿</p>
+                                    </div>
+                                    <div className="bg-slate-800 text-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-100">
+                                        <p className="opacity-80 mb-1 font-light">จำนวนออเดอร์</p>
+                                        <p className="text-5xl font-black">{orders.length}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MODAL: ADD PRODUCT (The New UI) */}
+                    {showAddModal && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-4">
+                            <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
+                                <div className="flex justify-between items-center p-6 border-b border-slate-100">
+                                    <h2 className="text-2xl font-bold text-slate-800">เพิ่มสินค้า</h2>
+                                    <button onClick={() => setShowAddModal(false)} className="bg-red-50 text-red-500 p-2 rounded-full">✕</button>
+                                </div>
+
+                                <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto no-scrollbar">
+                                    <div className="flex gap-6">
+                                        <div className="w-28 h-28 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center text-slate-300">
+                                            <span className="text-3xl font-bold">?</span>
+                                            <span className="text-[10px]">เลือกรูป</span>
+                                        </div>
                                         <div className="flex-1 space-y-4">
-                                            <div>
-                                                <label className="text-sm font-bold text-slate-700">ชื่อสินค้า <span className="text-red-500">*</span></label>
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="เช่น กาแฟเย็น" 
-                                                    className="w-full border-b-2 border-gray-100 p-2 focus:border-teal-500 outline-none text-lg transition-all"
-                                                    value={formData.name}
-                                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                                />
-                                            </div>
+                                            <input type="text" placeholder="ชื่อสินค้า *" className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-[#2497a9] text-lg transition-all" 
+                                                value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                                             <div className="flex gap-4">
                                                 <div className="flex-1">
-                                                    <label className="text-sm font-bold text-slate-700">ราคาขาย <span className="text-red-500">*</span></label>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="0" 
-                                                        className="w-full bg-gray-50 rounded-2xl p-3 mt-1 focus:ring-2 focus:ring-teal-500 outline-none"
-                                                        value={formData.price}
-                                                        onChange={(e) => setFormData({...formData, price: e.target.value})}
-                                                    />
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">ราคาขาย *</label>
+                                                    <input type="number" placeholder="0" className="w-full bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-[#2497a9]"
+                                                        value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <label className="text-sm font-bold text-slate-700 text-gray-400">ต้นทุน</label>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="0" 
-                                                        className="w-full bg-gray-50 rounded-2xl p-3 mt-1 focus:ring-2 focus:ring-teal-500 outline-none"
-                                                        value={formData.cost}
-                                                        onChange={(e) => setFormData({...formData, cost: e.target.value})}
-                                                    />
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">ต้นทุน</label>
+                                                    <input type="number" placeholder="0" className="w-full bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-[#2497a9]"
+                                                        value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} />
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Expandable Menu Rows */}
-                                    <div className="space-y-3 pt-4">
-                                        <div className="menu-item-row">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between p-4 border border-slate-100 rounded-2xl bg-slate-50/50 cursor-pointer">
                                             <div className="flex items-center gap-3">
-                                                <div className="text-teal-500 bg-teal-50 p-2 rounded-lg">🏷️</div>
+                                                <span className="teal-text">🏷️</span>
                                                 <span className="font-medium text-slate-700">หมวดหมู่</span>
                                             </div>
-                                            <div className="flex items-center gap-2 text-gray-400">
-                                                <span className="text-sm">{formData.category}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                </svg>
+                                            <span className="text-slate-400 text-sm">{formData.category} ❯</span>
+                                        </div>
+
+                                        <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/50">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="teal-text">📑</span>
+                                                    <span className="font-medium text-slate-700">ตัวเลือกสินค้า (Modifiers)</span>
+                                                </div>
+                                                <button className="teal-text text-xs font-bold">+ เพิ่มกลุ่ม</button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <span className="text-[10px] bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-500">ความหวาน</span>
+                                                <span className="text-[10px] bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-500">ท็อปปิ้ง</span>
                                             </div>
                                         </div>
 
-                                        <div className="menu-item-row">
+                                        <div className="flex items-center justify-between p-4 border border-slate-100 rounded-2xl bg-slate-50/50 cursor-pointer">
                                             <div className="flex items-center gap-3">
-                                                <div className="text-blue-500 bg-blue-50 p-2 rounded-lg">📑</div>
-                                                <span className="font-medium text-slate-700">ตัวเลือกสินค้า</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-gray-400">
-                                                <span className="text-sm">· {formData.options}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                </svg>
-                                            </div>
-                                        </div>
-
-                                        <div className="menu-item-row">
-                                            <div className="flex items-center gap-3">
-                                                <div className="text-orange-500 bg-orange-50 p-2 rounded-lg">🛵</div>
+                                                <span className="text-orange-500">🛵</span>
                                                 <span className="font-medium text-slate-700">ราคาขายเดลิเวอรี่</span>
                                             </div>
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                            </svg>
-                                        </div>
-
-                                        <div className="menu-item-row">
-                                            <div className="flex items-center gap-3">
-                                                <div className="text-indigo-500 bg-indigo-50 p-2 rounded-lg">🏪</div>
-                                                <span className="font-medium text-slate-700">เพิ่มไปยังร้านอื่นด้วย</span>
-                                            </div>
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                            </svg>
+                                            <span className="text-slate-400 text-sm">❯</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Footer Button */}
                                 <div className="p-6">
-                                    <button 
-                                        onClick={handleSave}
-                                        className="w-full bg-[#2497a9] hover:bg-[#1d7e8d] text-white py-4 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-all"
-                                    >
+                                    <button onClick={handleSaveProduct} className="w-full bg-[#2497a9] text-white py-5 rounded-[1.5rem] font-bold text-xl shadow-lg active-scale flex items-center justify-center gap-3">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                                         </svg>
-                                        บันทึก
+                                        บันทึกสินค้า
                                     </button>
                                 </div>
                             </div>
