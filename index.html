@@ -111,7 +111,22 @@
                 setForm({ name: '', price: '', cost: '', categoryId: 1 });
                 refreshData();
             };
+            // ฟังก์ชันเพิ่มหมวดหมู่ใหม่
+            const handleAddCategory = async () => {
+                const name = prompt("กรุณาระบุชื่อหมวดหมู่ใหม่:");
+                if (name) {
+                    await db.categories.add({ name: name });
+                    refreshData(); // อัปเดตข้อมูลในหน้าจอทันที
+                }
+            };
 
+            // ฟังก์ชันลบหมวดหมู่
+            const handleDeleteCategory = async (id) => {
+                if (confirm("ต้องการลบหมวดหมู่นี้ใช่หรือไม่? (สินค้าในหมวดนี้จะไม่ถูกลบ)")) {
+                    await db.categories.delete(id);
+                    refreshData();
+                }
+            };
             const handleConfirmPayment = async () => {
                 await db.orders.add({ total: cartTotal, timestamp: new Date(), paymentMethod, items: cart });
                 setCart([]); setShowPayment(false); setCashReceived(0);
