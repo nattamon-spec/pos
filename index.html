@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Final Stable Version</title>
+    <title>Lue cha POS | Stable Foundation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -17,7 +17,6 @@
         .luecha-blue { background-color: #003399; }
         .luecha-orange { background-color: #FF6600; }
         .btn-teal { background-color: #2497a9; }
-        .text-teal { color: #2497a9; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -26,52 +25,50 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 1. DATABASE CONFIGURATION (PERMANENT) ---
-        const db = new Dexie("LueCha_POS_FINAL_STABLE");
+        // ==========================================
+        // PART 1: DATABASE (โครงสร้างฐานข้อมูล)
+        // ==========================================
+        const db = new Dexie("LueCha_POS_Stable_DB");
         db.version(1).stores({
             products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
             orders: "++id, total, timestamp, paymentMethod, items"
         });
 
-        // --- INITIAL SEED DATA ---
-        const SEED_PRODUCTS = [
-            { name: "ชาไทย (Thai Tea)", price: 35, cost: 15, categoryId: 1 },
-            { name: "โกโก้ (Cocoa)", price: 35, cost: 18, categoryId: 1 }
-        ];
-
         function App() {
-            // --- CORE STATES ---
-            const [view, setView] = useState('pos'); // pos, admin, report
+            // ==========================================
+            // PART 2: STATES (ตัวแปรควบคุมระบบ)
+            // ==========================================
+            const [view, setView] = useState('pos');
             const [products, setProducts] = useState([]);
             const [categories, setCategories] = useState([]);
             const [orders, setOrders] = useState([]);
             const [cart, setCart] = useState([]);
 
-            // --- MODAL STATES ---
+            // Modal States
             const [selectedItem, setSelectedItem] = useState(null); // Image 5
             const [showProductModal, setShowProductModal] = useState(false); // Image 7
             const [editingProduct, setEditingProduct] = useState(null);
             const [showPayment, setShowPayment] = useState(false); // Image 4
 
-            // --- SELECTION STATES (Image 5) ---
+            // Selection States (Image 5)
             const [qty, setQty] = useState(1);
             const [size, setSize] = useState('S');
             const [toppings, setToppings] = useState([]);
 
-            // --- FORM STATES (Image 7) ---
+            // Form States (Image 7)
             const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: 1 });
             const [openSection, setOpenSection] = useState('category');
 
-            // --- PAYMENT STATES ---
+            // Payment States
             const [cashReceived, setCashReceived] = useState(0);
             const [paymentMethod, setPaymentMethod] = useState('cash');
 
-            // --- INITIALIZATION ---
+            // ==========================================
+            // PART 3: INITIALIZATION (โหลดข้อมูลเริ่มต้น)
+            // ==========================================
             useEffect(() => {
                 const init = async () => {
-                    const pCount = await db.products.count();
-                    if (pCount === 0) await db.products.bulkAdd(SEED_PRODUCTS);
                     if (await db.categories.count() === 0) await db.categories.add({ name: "เครื่องดื่ม" });
                     refreshData();
                 };
@@ -84,7 +81,9 @@
                 setOrders(await db.orders.toArray());
             };
 
-            // --- CALCULATIONS ---
+            // ==========================================
+            // PART 4: LOGIC (ระบบคำนวณ)
+            // ==========================================
             const currentItemTotal = useMemo(() => {
                 if (!selectedItem) return 0;
                 let base = Number(selectedItem.price);
@@ -97,12 +96,6 @@
             const cartTotal = useMemo(() => cart.reduce((s, i) => s + Number(i.totalPrice), 0), [cart]);
             const changeAmount = useMemo(() => Math.max(0, Number(cashReceived) - cartTotal), [cashReceived, cartTotal]);
 
-            // --- HANDLERS ---
-            const handleProductClick = (p) => {
-                setSelectedItem(p);
-                setQty(1); setSize('S'); setToppings([]);
-            };
-
             const handleAddToCart = () => {
                 const item = { ...selectedItem, cartId: Date.now(), qty, size, toppings, totalPrice: currentItemTotal };
                 setCart([...cart, item]);
@@ -110,7 +103,6 @@
             };
 
             const handleSaveProduct = async () => {
-                if (!form.name || !form.price) return alert("กรุณากรอกชื่อและราคา");
                 const data = { ...form, price: Number(form.price), cost: Number(form.cost || 0), categoryId: Number(form.categoryId) };
                 if (editingProduct) data.id = editingProduct.id;
                 await db.products.put(data);
@@ -121,13 +113,15 @@
             };
 
             const handleConfirmPayment = async () => {
-                if (paymentMethod === 'cash' && Number(cashReceived) < cartTotal) return alert("เงินรับมาไม่พอ");
                 await db.orders.add({ total: cartTotal, timestamp: new Date(), paymentMethod, items: cart });
                 setCart([]); setShowPayment(false); setCashReceived(0);
                 refreshData();
                 alert("ชำระเงินสำเร็จ!");
             };
 
+            // ==========================================
+            // PART 5: UI RENDER (ส่วนแสดงผล)
+            // ==========================================
             return (
                 <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
                     {/* Header */}
@@ -145,7 +139,7 @@
                         <div className="flex-1 flex overflow-hidden">
                             <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar">
                                 {products.map(p => (
-                                    <button key={p.id} onClick={() => handleProductClick(p)}
+                                    <button key={p.id} onClick={() => {setSelectedItem(p); setQty(1); setSize('S'); setToppings([]);}}
                                         className="bg-white p-5 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-44 border-2 border-transparent hover:border-orange-500 transition-all">
                                         <span className="font-bold text-slate-800 text-lg">{p.name}</span>
                                         <span className="text-blue-700 font-black text-2xl">{p.price}฿</span>
@@ -219,7 +213,11 @@
                         </div>
                     )}
 
-                    {/* MODAL: IMAGE 5 (Ordering) */}
+                    {/* ==========================================
+                        PART 6: MODALS (ป๊อปอัพต่างๆ)
+                    ========================================== */}
+                    
+                    {/* MODAL: IMAGE 5 (เลือกสินค้า) */}
                     {selectedItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
@@ -286,7 +284,7 @@
                         </div>
                     )}
 
-                    {/* MODAL: IMAGE 7 (Add/Edit) */}
+                    {/* MODAL: IMAGE 7 (เพิ่ม/แก้ไขสินค้า) */}
                     {showProductModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
@@ -301,22 +299,13 @@
                                             <span className="text-[10px]">เลือกรูป</span>
                                         </div>
                                         <div className="flex-1 space-y-4">
-                                            <div>
-                                                <label className="text-xs font-bold text-slate-700 uppercase">ชื่อสินค้า *</label>
-                                                <input type="text" placeholder="เช่น กาแฟเย็น" className="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-teal-500 transition-all"
-                                                    value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                                            </div>
+                                            <input type="text" placeholder="ชื่อสินค้า *" className="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-teal-500 transition-all"
+                                                value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
                                             <div className="flex gap-4">
-                                                <div className="flex-1">
-                                                    <label className="text-xs font-bold text-slate-700 uppercase">ราคาขาย *</label>
-                                                    <input type="number" placeholder="0" className="w-full bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500"
-                                                        value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <label className="text-xs font-bold text-slate-700 uppercase">ต้นทุน</label>
-                                                    <input type="number" placeholder="0" className="w-full bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500"
-                                                        value={form.cost} onChange={e => setForm({...form, cost: e.target.value})} />
-                                                </div>
+                                                <input type="number" placeholder="ราคาขาย *" className="w-full bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500"
+                                                    value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
+                                                <input type="number" placeholder="ต้นทุน" className="w-full bg-slate-50 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500"
+                                                    value={form.cost} onChange={e => setForm({...form, cost: e.target.value})} />
                                             </div>
                                         </div>
                                     </div>
@@ -348,7 +337,7 @@
                         </div>
                     )}
 
-                    {/* MODAL: IMAGE 4 (Payment) */}
+                    {/* MODAL: IMAGE 4 (ชำระเงิน) */}
                     {showPayment && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col">
