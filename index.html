@@ -3,248 +3,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS Enterprise</title>
+    <title>Lue cha POS - Add Product UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Kanit', sans-serif; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .active-click:active { transform: scale(0.96); transition: 0.1s; }
+        body { font-family: 'Kanit', sans-serif; background-color: #f8fafc; }
+        .input-field { @apply w-full border border-gray-300 rounded-xl p-3 mt-1 focus:ring-2 focus:ring-teal-500 outline-none transition-all; }
+        .menu-item-row { @apply flex items-center justify-between p-4 border border-gray-200 rounded-2xl mb-3 bg-white active:bg-gray-50 cursor-pointer; }
     </style>
 </head>
-<body class="bg-gray-50">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect } = React;
 
-        // --- 1. Database Schema (Advanced) ---
-        const db = new Dexie("LueChaEnterpriseDB");
-        db.version(3).stores({
-            ingredients: "++id, name, unit, stock, minStock", // วัตถุดิบ (ผงชา, นม, น้ำตาล)
-            menu: "++id, name, price, category", // รายการเมนู
-            recipes: "++id, menuId, ingredientId, amount", // สูตรอาหาร (เมนูนี้ใช้อะไรเท่าไหร่)
-            orders: "++id, total, timestamp, staff, paymentMethod, status",
-            auditLogs: "++id, timestamp, action, staff" // บันทึกการทำงานป้องกันโกง
+        // --- Database Setup ---
+        const db = new Dexie("LueCha_v4");
+        db.version(1).stores({
+            products: "++id, name, price, cost, deliveryPrice, categoryId"
         });
 
-        // --- 2. Main Application ---
         function App() {
-            const [view, setView] = useState('login'); // login, pos, admin, report
-            const [user, setUser] = useState(null);
-            const [cart, setCart] = useState([]);
-            const [menu, setMenu] = useState([]);
-            const [ingredients, setIngredients] = useState([]);
-            const [orders, setOrders] = useState([]);
-            const [isOnline, setIsOnline] = useState(navigator.onLine);
+            const [showModal, setShowModal] = useState(true); // เปิดไว้เพื่อโชว์ UI ทันที
+            const [formData, setFormData] = useState({
+                name: '',
+                price: '',
+                cost: '',
+                deliveryPrice: '',
+                category: 'ยังไม่ได้เลือก',
+                options: '1 กลุ่ม'
+            });
 
-            useEffect(() => {
-                const initData = async () => {
-                    // สร้างข้อมูลเริ่มต้นถ้ายังไม่มี
-                    if (await db.ingredients.count() === 0) {
-                        await db.ingredients.bulkAdd([
-                            { name: "ผงชาไทย", unit: "กรัม", stock: 1000, minStock: 200 },
-                            { name: "นมสด", unit: "มล.", stock: 5000, minStock: 1000 },
-                            { name: "น้ำตาล", unit: "กรัม", stock: 2000, minStock: 500 }
-                        ]);
-                    }
-                    refreshAllData();
-                };
-                initData();
-                window.addEventListener('online', () => setIsOnline(true));
-                window.addEventListener('offline', () => setIsOnline(false));
-            }, []);
-
-            const refreshAllData = async () => {
-                setMenu(await db.menu.toArray());
-                setIngredients(await db.ingredients.toArray());
-                setOrders(await db.orders.toArray());
+            const handleSave = async () => {
+                if(!formData.name || !formData.price) return alert("กรุณากรอกข้อมูลที่จำเป็น (*)");
+                await db.products.add(formData);
+                alert("บันทึกสินค้าเรียบร้อย!");
+                // setShowModal(false);
             };
-
-            // --- Logic: Recipe-Based Stock Cutting ---
-            const processOrder = async (paymentMethod) => {
-                const total = cart.reduce((sum, i) => sum + i.price, 0);
-                const orderId = await db.orders.add({
-                    items: cart,
-                    total: total,
-                    timestamp: new Date(),
-                    staff: user.name,
-                    paymentMethod: paymentMethod,
-                    status: 'completed'
-                });
-
-                // ตัดสต็อกตามสูตร (Recipe)
-                for (const item of cart) {
-                    const recipes = await db.recipes.where('menuId').equals(item.id).toArray();
-                    for (const r of recipes) {
-                        await db.ingredients.where('id').equals(r.ingredientId).modify(ing => ing.stock -= r.amount);
-                    }
-                }
-
-                await db.auditLogs.add({ timestamp: new Date(), action: `ขายสินค้า ออเดอร์ #${orderId}`, staff: user.name });
-                
-                setCart([]);
-                refreshAllData();
-                alert("ชำระเงินสำเร็จ!");
-            };
-
-            // --- UI: Navigation ---
-            const Nav = () => (
-                <nav className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-xl">
-                    <div className="flex items-center gap-4">
-                        <span className="text-xl font-bold text-yellow-400">Lue cha POS</span>
-                        <div className="hidden md:flex gap-2">
-                            <button onClick={() => setView('pos')} className={`px-4 py-1 rounded-full ${view === 'pos' ? 'bg-yellow-400 text-black' : ''}`}>ขายหน้าร้าน</button>
-                            <button onClick={() => setView('admin')} className={`px-4 py-1 rounded-full ${view === 'admin' ? 'bg-yellow-400 text-black' : ''}`}>จัดการเมนู/สต็อก</button>
-                            <button onClick={() => setView('report')} className={`px-4 py-1 rounded-full ${view === 'report' ? 'bg-yellow-400 text-black' : ''}`}>รายงาน</button>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <span className="text-xs">{isOnline ? '🟢 Online' : '🟠 Offline'}</span>
-                        <span className="font-medium">{user?.name}</span>
-                        <button onClick={() => setView('login')} className="bg-red-500 px-3 py-1 rounded text-sm">ออก</button>
-                    </div>
-                </nav>
-            );
-
-            // --- UI: Login ---
-            if (view === 'login') return (
-                <div className="h-screen bg-slate-900 flex items-center justify-center p-6">
-                    <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md text-center">
-                        <h1 className="text-3xl font-bold mb-6">เข้าสู่ระบบ</h1>
-                        <div className="space-y-4">
-                            <button onClick={() => {setUser({name: 'เจ้าของร้าน', role: 'owner'}); setView('pos');}} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold active-click">เจ้าของร้าน (Owner)</button>
-                            <button onClick={() => {setUser({name: 'พนักงาน A', role: 'staff'}); setView('pos');}} className="w-full py-4 bg-slate-100 text-slate-800 rounded-2xl font-bold active-click">พนักงาน (Staff)</button>
-                        </div>
-                    </div>
-                </div>
-            );
 
             return (
-                <div className="h-screen flex flex-col overflow-hidden">
-                    <Nav />
+                <div className="min-h-screen p-4 flex items-center justify-center">
                     
-                    {view === 'pos' && (
-                        <div className="flex-1 flex overflow-hidden">
-                            {/* Menu Grid */}
-                            <div className="flex-1 p-6 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto bg-gray-100 no-scrollbar">
-                                {menu.length === 0 && <div className="col-span-full text-center p-10 text-gray-400">ยังไม่มีเมนู กรุณาเพิ่มเมนูที่หน้าจัดการ</div>}
-                                {menu.map(item => (
-                                    <button key={item.id} onClick={() => setCart([...cart, {...item, cartId: Date.now()}])}
-                                        className="bg-white p-6 rounded-3xl shadow-sm hover:shadow-md active-click flex flex-col items-center justify-center border-2 border-transparent hover:border-yellow-400 h-40">
-                                        <span className="text-lg font-bold text-slate-800">{item.name}</span>
-                                        <span className="text-xl font-black text-blue-600">{item.price}฿</span>
-                                    </button>
-                                ))}
-                            </div>
-                            {/* Cart */}
-                            <div className="w-96 bg-white shadow-2xl flex flex-col">
-                                <div className="p-6 border-b font-bold text-xl">ตะกร้าสินค้า</div>
-                                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                                    {cart.map(item => (
-                                        <div key={item.cartId} className="flex justify-between items-center">
-                                            <span>{item.name}</span>
-                                            <div className="flex items-center gap-4">
-                                                <span className="font-bold">{item.price}฿</span>
-                                                <button onClick={() => setCart(cart.filter(i => i.cartId !== item.cartId))} className="text-red-400 text-xs">ลบ</button>
+                    {/* ปุ่มจำลองการเปิด Modal */}
+                    {!showModal && (
+                        <button onClick={() => setShowModal(true)} className="bg-teal-600 text-white px-6 py-3 rounded-xl font-bold">
+                            + เพิ่มสินค้า
+                        </button>
+                    )}
+
+                    {/* --- Add Product Modal (ตามรูปที่คุณส่งมา) --- */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
+                            <div className="bg-white w-full max-w-lg rounded-t-[30px] md:rounded-[30px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
+                                
+                                {/* Header */}
+                                <div className="flex justify-between items-center p-5 border-b border-gray-100">
+                                    <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                                        <span className="text-teal-600">เพิ่มสินค้า</span>
+                                    </h2>
+                                    <div className="flex gap-3">
+                                        <button className="text-gray-400 hover:text-gray-600">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="Step 13" />
+                                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                                                <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                            </svg>
+                                        </button>
+                                        <button onClick={() => setShowModal(false)} className="bg-red-100 text-red-500 p-1 rounded-full hover:bg-red-200 transition-colors">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Body */}
+                                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
+                                    
+                                    {/* Top Section: Image & Basic Info */}
+                                    <div className="flex gap-6">
+                                        {/* Image Upload Placeholder */}
+                                        <div className="w-32 h-32 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-100 transition-all">
+                                            <span className="text-4xl font-bold text-teal-200">?</span>
+                                            <span className="text-xs mt-1">เลือกรูป</span>
+                                        </div>
+
+                                        {/* Name, Price, Cost */}
+                                        <div className="flex-1 space-y-4">
+                                            <div>
+                                                <label className="text-sm font-bold text-slate-700">ชื่อสินค้า <span className="text-red-500">*</span></label>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="เช่น กาแฟเย็น" 
+                                                    className="w-full border-b-2 border-gray-100 p-2 focus:border-teal-500 outline-none text-lg transition-all"
+                                                    value={formData.name}
+                                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                                />
+                                            </div>
+                                            <div className="flex gap-4">
+                                                <div className="flex-1">
+                                                    <label className="text-sm font-bold text-slate-700">ราคาขาย <span className="text-red-500">*</span></label>
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="0" 
+                                                        className="w-full bg-gray-50 rounded-2xl p-3 mt-1 focus:ring-2 focus:ring-teal-500 outline-none"
+                                                        value={formData.price}
+                                                        onChange={(e) => setFormData({...formData, price: e.target.value})}
+                                                    />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-sm font-bold text-slate-700 text-gray-400">ต้นทุน</label>
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="0" 
+                                                        className="w-full bg-gray-50 rounded-2xl p-3 mt-1 focus:ring-2 focus:ring-teal-500 outline-none"
+                                                        value={formData.cost}
+                                                        onChange={(e) => setFormData({...formData, cost: e.target.value})}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                                <div className="p-6 bg-gray-50 border-t">
-                                    <div className="flex justify-between text-2xl font-black mb-6">
-                                        <span>รวม</span>
-                                        <span className="text-blue-600">{cart.reduce((s, i) => s + i.price, 0)}฿</span>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={() => processOrder('qr')} disabled={cart.length === 0} className="bg-blue-600 text-white py-4 rounded-2xl font-bold active-click disabled:bg-gray-300">QR PromptPay</button>
-                                        <button onClick={() => processOrder('cash')} disabled={cart.length === 0} className="bg-emerald-600 text-white py-4 rounded-2xl font-bold active-click disabled:bg-gray-300">เงินสด</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
-                    {view === 'admin' && (
-                        <div className="flex-1 p-8 overflow-y-auto bg-white">
-                            <div className="max-w-4xl mx-auto">
-                                <h2 className="text-2xl font-bold mb-8">จัดการระบบ (Admin)</h2>
-                                
-                                {/* ส่วนจัดการวัตถุดิบ */}
-                                <section className="mb-12 bg-gray-50 p-6 rounded-3xl">
-                                    <h3 className="text-lg font-bold mb-4">คลังวัตถุดิบ (Ingredients)</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        {ingredients.map(ing => (
-                                            <div key={ing.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                                                <p className="font-bold">{ing.name}</p>
-                                                <p className={`text-2xl font-black ${ing.stock <= ing.minStock ? 'text-red-500' : 'text-blue-600'}`}>{ing.stock} <span className="text-sm font-normal text-gray-400">{ing.unit}</span></p>
-                                                {ing.stock <= ing.minStock && <p className="text-[10px] text-red-400 font-bold uppercase mt-1">ของใกล้หมด!</p>}
+                                    {/* Expandable Menu Rows */}
+                                    <div className="space-y-3 pt-4">
+                                        <div className="menu-item-row">
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-teal-500 bg-teal-50 p-2 rounded-lg">🏷️</div>
+                                                <span className="font-medium text-slate-700">หมวดหมู่</span>
                                             </div>
-                                        ))}
-                                    </div>
-                                </section>
-
-                                {/* ส่วนจัดการเมนู */}
-                                <section className="bg-gray-50 p-6 rounded-3xl">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-lg font-bold">รายการเมนู (Menu)</h3>
-                                        <button onClick={async () => {
-                                            const name = prompt("ชื่อเมนู:");
-                                            const price = parseInt(prompt("ราคา:"));
-                                            if(name && price) {
-                                                await db.menu.add({name, price, category: 'General'});
-                                                refreshAllData();
-                                            }
-                                        }} className="bg-yellow-400 px-4 py-2 rounded-xl font-bold text-sm">+ เพิ่มเมนู</button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {menu.map(m => (
-                                            <div key={m.id} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm">
-                                                <span>{m.name} - <span className="font-bold">{m.price}฿</span></span>
-                                                <button onClick={async () => {
-                                                    const ingId = parseInt(prompt("ID วัตถุดิบ (1:ผงชา, 2:นม, 3:น้ำตาล):"));
-                                                    const amount = parseInt(prompt("ปริมาณที่ใช้ต่อแก้ว:"));
-                                                    if(ingId && amount) {
-                                                        await db.recipes.add({menuId: m.id, ingredientId: ingId, amount});
-                                                        alert("ผูกสูตรสำเร็จ!");
-                                                    }
-                                                }} className="text-blue-500 text-xs underline">ผูกสูตรตัดสต็อก</button>
+                                            <div className="flex items-center gap-2 text-gray-400">
+                                                <span className="text-sm">{formData.category}</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                </svg>
                                             </div>
-                                        ))}
-                                    </div>
-                                </section>
-                            </div>
-                        </div>
-                    )}
+                                        </div>
 
-                    {view === 'report' && (
-                        <div className="flex-1 p-8 overflow-y-auto bg-white">
-                            <div className="max-w-4xl mx-auto">
-                                <h2 className="text-2xl font-bold mb-8">รายงานยอดขายและ Audit Log</h2>
-                                <div className="grid grid-cols-2 gap-4 mb-8">
-                                    <div className="bg-blue-600 text-white p-6 rounded-3xl">
-                                        <p className="text-sm opacity-80">ยอดขายรวมทั้งหมด</p>
-                                        <p className="text-4xl font-black">{orders.reduce((s, o) => s + o.total, 0).toLocaleString()}฿</p>
-                                    </div>
-                                    <div className="bg-emerald-600 text-white p-6 rounded-3xl">
-                                        <p className="text-sm opacity-80">จำนวนออเดอร์</p>
-                                        <p className="text-4xl font-black">{orders.length}</p>
+                                        <div className="menu-item-row">
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-blue-500 bg-blue-50 p-2 rounded-lg">📑</div>
+                                                <span className="font-medium text-slate-700">ตัวเลือกสินค้า</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-gray-400">
+                                                <span className="text-sm">· {formData.options}</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                </svg>
+                                            </div>
+                                        </div>
+
+                                        <div className="menu-item-row">
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-orange-500 bg-orange-50 p-2 rounded-lg">🛵</div>
+                                                <span className="font-medium text-slate-700">ราคาขายเดลิเวอรี่</span>
+                                            </div>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </div>
+
+                                        <div className="menu-item-row">
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-indigo-500 bg-indigo-50 p-2 rounded-lg">🏪</div>
+                                                <span className="font-medium text-slate-700">เพิ่มไปยังร้านอื่นด้วย</span>
+                                            </div>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="bg-gray-50 p-6 rounded-3xl">
-                                    <h3 className="font-bold mb-4">ประวัติการขายล่าสุด</h3>
-                                    <div className="space-y-2">
-                                        {orders.slice().reverse().map(o => (
-                                            <div key={o.id} className="bg-white p-4 rounded-xl flex justify-between text-sm shadow-sm">
-                                                <span>{new Date(o.timestamp).toLocaleTimeString()} - {o.staff}</span>
-                                                <span className="font-bold text-blue-600">{o.total}฿ ({o.paymentMethod})</span>
-                                            </div>
-                                        ))}
-                                    </div>
+
+                                {/* Footer Button */}
+                                <div className="p-6">
+                                    <button 
+                                        onClick={handleSave}
+                                        className="w-full bg-[#2497a9] hover:bg-[#1d7e8d] text-white py-4 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-all"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                        </svg>
+                                        บันทึก
+                                    </button>
                                 </div>
                             </div>
                         </div>
