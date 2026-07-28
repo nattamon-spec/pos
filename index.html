@@ -26,19 +26,18 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-       // ==========================================
-        // PART 1: DATABASE
+  // ==========================================
+        // PART 1: DATABASE (โครงสร้างฐานข้อมูล)
         // ==========================================
-        const db = new Dexie("LueCha_POS_Master_DB");
-        db.version(1).stores({
+        const db = new Dexie("LueCha_POS_ULTIMATE_V1");
+        db.version(4).stores({ // ขยับเป็น Version 4 เพื่อความสดใหม่
             products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
-            // เพิ่ม targetCategoryIds เข้าไปในโครงสร้าง
             modifierGroups: "++id, name, selectionType, applyTo, targetIds, targetCategoryIds, isRequired",
-            orders: "++id, total, timestamp, paymentMethod"
+            orders: "++id, total, timestamp, paymentMethod, items"
         });
             // ==========================================
-            // PART 2: STATES
+            // PART 2: STATES (ตัวแปรควบคุมระบบ)
             // ==========================================
             const [view, setView] = useState('pos');
             const [adminTab, setAdminTab] = useState('products');
@@ -48,6 +47,7 @@
             const [orders, setOrders] = useState([]);
             const [cart, setCart] = useState([]);
 
+            // Modals
             const [selectedItem, setSelectedItem] = useState(null); 
             const [showProductModal, setShowProductModal] = useState(false); 
             const [showModifierModal, setShowModifierModal] = useState(false); 
@@ -55,18 +55,20 @@
             const [editingModifier, setEditingModifier] = useState(null);
             const [showPayment, setShowPayment] = useState(false); 
 
+            // Selection (Image 5)
             const [qty, setQty] = useState(1);
             const [size, setSize] = useState('S');
             const [activeToppings, setActiveToppings] = useState([]);
 
-            const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: '' });
-            
-            // อัปเดต modForm ให้มี targetCategoryIds: []
+            // Form States (Image 7 & 8)
+            const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: 1 });
             const [modForm, setModForm] = useState({
                 name: '', selectionType: 'single', applyTo: 'all', targetIds: [], targetCategoryIds: [], isRequired: false,
                 options: [{ name: '', price: 0, cost: 0, isDefault: false }]
             });
             const [openSection, setOpenSection] = useState('category');
+
+            // Payment
             const [cashReceived, setCashReceived] = useState(0);
             const [paymentMethod, setPaymentMethod] = useState('cash');
             // ==========================================
@@ -399,16 +401,14 @@
                     )}
 
              {/* MODAL: IMAGE 8 (เพิ่ม/แก้ไขกลุ่มตัวเลือก - อัปเดตตามรูปที่ 9) */}
+                  {/* MODAL: IMAGE 8 (เพิ่ม/แก้ไขกลุ่มตัวเลือก - FULL VERSION) */}
                     {showModifierModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
                             <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
                                 {/* Header */}
                                 <div className="p-5 border-b flex justify-between items-center">
                                     <span className="font-bold text-teal-600 text-xl">{editingModifier ? 'แก้ไขกลุ่มตัวเลือก' : 'เพิ่มกลุ่มตัวเลือก'}</span>
-                                    <div className="flex gap-2">
-                                        <span className="text-slate-300 cursor-help">ⓘ</span>
-                                        <button onClick={() => setShowModifierModal(false)} className="text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
-                                    </div>
+                                    <button onClick={() => setShowModifierModal(false)} className="text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
                                 </div>
 
                                 <div className="p-6 space-y-6 overflow-y-auto no-scrollbar">
@@ -419,27 +419,39 @@
                                             value={modForm.name} onChange={e => setModForm({...modForm, name: e.target.value})} />
                                     </div>
                                     
+                                    {/* บังคับเลือก Toggle (Image 10) */}
+                                    <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <div>
+                                            <p className="font-bold text-slate-700 text-sm">บังคับเลือก</p>
+                                            <p className="text-[10px] text-slate-400">ลูกค้าต้องเลือกอย่างน้อย 1 อย่างในกลุ่มนี้</p>
+                                        </div>
+                                        <button onClick={() => setModForm({...modForm, isRequired: !modForm.isRequired})} 
+                                            className={`w-12 h-7 rounded-full transition-all relative ${modForm.isRequired ? 'btn-teal' : 'bg-slate-300'}`}>
+                                            <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-all ${modForm.isRequired ? 'left-6' : 'left-1'}`}></div>
+                                        </button>
+                                    </div>
+
                                     {/* ลูกค้าเลือกได้ */}
                                     <div>
                                         <label className="text-xs font-bold text-slate-700 uppercase">ลูกค้าเลือกได้</label>
-                                        <div className="flex p-1 bg-slate-100 rounded-2xl mt-2">
+                                        <div className="flex p-1 bg-slate-100 rounded-2xl mt-2 border border-slate-200">
                                             <button onClick={() => setModForm({...modForm, selectionType: 'single'})} className={`flex-1 py-3 rounded-xl font-bold transition-all ${modForm.selectionType==='single'?'bg-white text-teal-600 shadow-sm':'text-slate-400'}`}>1 อย่าง</button>
                                             <button onClick={() => setModForm({...modForm, selectionType: 'multiple'})} className={`flex-1 py-3 rounded-xl font-bold transition-all ${modForm.selectionType==='multiple'?'bg-white text-teal-600 shadow-sm':'text-slate-400'}`}>หลายอย่าง</button>
                                         </div>
                                     </div>
 
-                                    {/* ใช้กับ (อัปเดตตามรูปที่ 9) */}
+                                    {/* ใช้กับ (Image 9 Style) */}
                                     <div>
                                         <label className="text-xs font-bold text-slate-700 uppercase">ใช้กับ</label>
                                         <div className="flex flex-wrap gap-2 mt-2">
                                             <button onClick={() => setModForm({...modForm, applyTo: 'all'})} className={`px-5 py-2 rounded-full border-2 text-sm font-bold transition-all ${modForm.applyTo==='all'?'border-teal-500 bg-teal-50 text-teal-600':'border-slate-100 text-slate-400 bg-slate-50'}`}>ทุกสินค้า</button>
-                                            <button onClick={() => setModForm({...modForm, applyTo: 'categories'})} className={`px-5 py-2 rounded-full border-2 text-sm font-bold transition-all ${modForm.applyTo==='categories'?'border-teal-500 bg-teal-50 text-teal-600':'border-slate-100 text-slate-400 bg-slate-50'}`}>✓ บางหมวดหมู่</button>
+                                            <button onClick={() => setModForm({...modForm, applyTo: 'categories'})} className={`px-5 py-2 rounded-full border-2 text-sm font-bold transition-all ${modForm.applyTo==='categories'?'border-teal-500 bg-teal-50 text-teal-600':'border-slate-100 text-slate-400 bg-slate-50'}`}>บางหมวดหมู่</button>
                                             <button onClick={() => setModForm({...modForm, applyTo: 'products'})} className={`px-5 py-2 rounded-full border-2 text-sm font-bold transition-all ${modForm.applyTo==='products'?'border-teal-500 bg-teal-50 text-teal-600':'border-slate-100 text-slate-400 bg-slate-50'}`}>บางสินค้า</button>
                                         </div>
 
-                                        {/* แสดงรายการหมวดหมู่ (Image 9 Style) */}
+                                        {/* รายการหมวดหมู่ */}
                                         {modForm.applyTo === 'categories' && (
-                                            <div className="flex flex-wrap gap-2 mt-4 animate-in fade-in duration-200">
+                                            <div className="flex flex-wrap gap-2 mt-4 p-1">
                                                 {categories.map(c => {
                                                     const isSel = modForm.targetCategoryIds?.includes(c.id);
                                                     return (
@@ -458,9 +470,9 @@
                                             </div>
                                         )}
 
-                                        {/* แสดงรายการสินค้า */}
+                                        {/* รายการสินค้า */}
                                         {modForm.applyTo === 'products' && (
-                                            <div className="mt-4 p-4 bg-slate-50 rounded-3xl border max-h-48 overflow-y-auto no-scrollbar animate-in fade-in duration-200">
+                                            <div className="mt-4 p-4 bg-slate-50 rounded-3xl border max-h-48 overflow-y-auto no-scrollbar">
                                                 {products.map(p => (
                                                     <label key={p.id} className="flex items-center gap-3 mb-3 cursor-pointer group">
                                                         <input type="checkbox" checked={modForm.targetIds.includes(p.id)} 
@@ -473,54 +485,34 @@
                                                 ))}
                                             </div>
                                         )}
-                                        
-                                        <div className="mt-3 text-[10px] text-slate-400 font-bold">
-                                            มีผลกับ {
-                                                modForm.applyTo === 'all' ? products.length :
-                                                modForm.applyTo === 'categories' ? products.filter(p => modForm.targetCategoryIds?.includes(Number(p.categoryId))).length :
-                                                modForm.targetIds.length
-                                            } สินค้า
-                                        </div>
                                     </div>
 
-                                    {/* บังคับเลือก Toggle */}
-                                    <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                        <div>
-                                            <p className="font-bold text-slate-700 text-sm">บังคับเลือก</p>
-                                            <p className="text-[10px] text-slate-400">ลูกค้าต้องเลือกอย่างน้อย 1 อย่างในกลุ่มนี้</p>
-                                        </div>
-                                        <button onClick={() => setModForm({...modForm, isRequired: !modForm.isRequired})} 
-                                            className={`w-12 h-7 rounded-full transition-all relative ${modForm.isRequired ? 'btn-teal' : 'bg-slate-300'}`}>
-                                            <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-all ${modForm.isRequired ? 'left-6' : 'left-1'}`}></div>
-                                        </button>
-                                    </div>
-
-                                    {/* ตัวเลือกย่อย */}
+                                    {/* ตัวเลือกย่อย (Image 8/10 Style) */}
                                     <div>
                                         <div className="flex justify-between items-center mb-4">
                                             <label className="text-xs font-bold text-slate-700 uppercase">ตัวเลือกย่อย *</label>
-                                            <div className="flex gap-8 text-[10px] text-slate-400 font-bold uppercase pr-12">
+                                            <div className="flex gap-10 text-[10px] text-slate-400 font-bold uppercase pr-12">
                                                 <span>ราคา +/-</span>
                                                 <span>ต้นทุน</span>
                                             </div>
                                         </div>
                                         <div className="space-y-3">
                                             {modForm.options.map((opt, idx) => (
-                                                <div key={idx} className="flex items-center gap-2 group">
+                                                <div key={idx} className="flex items-center gap-2 group animate-in fade-in">
                                                     <span className="text-slate-300">⠿</span>
-                                                    <input type="text" placeholder="เช่น หวานน้อย" className="flex-1 bg-slate-50 p-3 rounded-2xl outline-none text-sm border border-transparent focus:border-teal-500"
+                                                    <input type="text" placeholder="ชื่อ" className="flex-1 bg-slate-50 p-3 rounded-2xl outline-none text-sm border border-transparent focus:border-teal-500"
                                                         value={opt.name} onChange={e => {
                                                             const newOpts = [...modForm.options];
                                                             newOpts[idx].name = e.target.value;
                                                             setModForm({...modForm, options: newOpts});
                                                         }} />
-                                                    <input type="number" className="w-16 bg-slate-50 p-3 rounded-2xl outline-none text-sm text-center border border-transparent focus:border-teal-500"
+                                                    <input type="number" placeholder="0" className="w-16 bg-slate-50 p-3 rounded-2xl outline-none text-sm text-center border border-transparent focus:border-teal-500"
                                                         value={opt.price} onChange={e => {
                                                             const newOpts = [...modForm.options];
                                                             newOpts[idx].price = Number(e.target.value);
                                                             setModForm({...modForm, options: newOpts});
                                                         }} />
-                                                    <input type="number" className="w-16 bg-slate-50 p-3 rounded-2xl outline-none text-sm text-center border border-transparent focus:border-teal-500"
+                                                    <input type="number" placeholder="0" className="w-16 bg-slate-50 p-3 rounded-2xl outline-none text-sm text-center border border-transparent focus:border-teal-500"
                                                         value={opt.cost} onChange={e => {
                                                             const newOpts = [...modForm.options];
                                                             newOpts[idx].cost = Number(e.target.value);
@@ -530,7 +522,7 @@
                                                         const newOpts = [...modForm.options];
                                                         newOpts[idx].isDefault = !newOpts[idx].isDefault;
                                                         setModForm({...modForm, options: newOpts});
-                                                    }} className={`text-xl ${opt.isDefault ? 'text-yellow-400' : 'text-slate-200'}`}>★</button>
+                                                    }} className={`text-xl transition-colors ${opt.isDefault ? 'text-yellow-400' : 'text-slate-200'}`}>★</button>
                                                     <button onClick={() => {
                                                         const newOpts = modForm.options.filter((_, i) => i !== idx);
                                                         setModForm({...modForm, options: newOpts});
@@ -543,7 +535,9 @@
                                     </div>
                                 </div>
                                 <div className="p-6 border-t bg-white">
-                                    <button onClick={handleSaveModifierGroup} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale shadow-lg">💾 บันทึก</button>
+                                    <button onClick={handleSaveModifierGroup} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale shadow-lg flex items-center justify-center gap-2">
+                                        💾 บันทึก
+                                    </button>
                                 </div>
                             </div>
                         </div>
