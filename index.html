@@ -168,8 +168,8 @@
                 alert("ชำระเงินสำเร็จ!");
             };
 
-            // ==========================================
-            // PART 5: UI RENDER
+         // ==========================================
+            // PART 5: UI RENDER (ส่วนแสดงผลหลัก - ซ่อมแซมแล้ว)
             // ==========================================
             return (
                 <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
@@ -177,34 +177,40 @@
                     <header className="luecha-blue p-4 text-white flex justify-between items-center shadow-lg z-10">
                         <h1 className="font-bold text-xl">เลื่องชื่อลือชา POS</h1>
                         <div className="flex gap-2">
-                            <button onClick={() => setView('pos')} className={`px-4 py-1.5 rounded-full text-sm ${view==='pos'?'luecha-orange':'opacity-50'}`}>หน้าขาย</button>
-                            <button onClick={() => setView('admin')} className={`px-4 py-1.5 rounded-full text-sm ${view==='admin'?'luecha-orange':'opacity-50'}`}>จัดการร้าน</button>
-                            <button onClick={() => setView('report')} className={`px-4 py-1.5 rounded-full text-sm ${view==='report'?'luecha-orange':'opacity-50'}`}>รายงาน</button>
+                            <button onClick={() => setView('pos')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${view==='pos'?'luecha-orange shadow-inner':'opacity-60 hover:opacity-100'}`}>หน้าขาย</button>
+                            <button onClick={() => setView('admin')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${view==='admin'?'luecha-orange shadow-inner':'opacity-60 hover:opacity-100'}`}>จัดการร้าน</button>
+                            <button onClick={() => setView('report')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${view==='report'?'luecha-orange shadow-inner':'opacity-60 hover:opacity-100'}`}>รายงาน</button>
                         </div>
                     </header>
 
-                    {/* VIEW: POS */}
+                    {/* VIEW: POS (หน้าขาย) */}
                     {view === 'pos' && (
                         <div className="flex-1 flex overflow-hidden">
                             <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar bg-slate-100">
                                 {products.map(p => (
                                     <button key={p.id} onClick={() => {setSelectedItem(p); setQty(1); setSize('S'); setActiveToppings([]);}}
                                         className="bg-white p-5 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-44 border-2 border-transparent hover:border-orange-500 transition-all">
-                                        <span className="font-bold text-slate-800 text-lg">{p.name}</span>
+                                        <span className="font-bold text-slate-800 text-lg text-center mb-1">{p.name}</span>
                                         <span className="text-blue-700 font-black text-2xl">{p.price}฿</span>
+                                        <span className="text-[10px] text-slate-400 mt-2 uppercase">แตะเพื่อสั่ง</span>
                                     </button>
                                 ))}
+                                {products.length === 0 && <div className="col-span-full text-center py-20 text-slate-400">ยังไม่มีสินค้าในระบบ</div>}
                             </div>
+
                             <div className="w-80 md:w-96 bg-white shadow-2xl flex flex-col">
-                                <div className="p-6 border-b font-bold text-slate-700">ตะกร้าสินค้า</div>
+                                <div className="p-6 border-b font-bold text-slate-700 text-lg">ตะกร้าสินค้า ({cart.length})</div>
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                     {cart.map(item => (
-                                        <div key={item.cartId} className="bg-slate-50 p-4 rounded-2xl relative border">
-                                            <div className="flex justify-between font-bold">
+                                        <div key={item.cartId} className="bg-slate-50 p-4 rounded-2xl relative border border-slate-100">
+                                            <div className="flex justify-between font-bold text-slate-800">
                                                 <span>{item.name} x{item.qty} ({item.size})</span>
                                                 <span>{item.totalPrice}฿</span>
                                             </div>
-                                            <button onClick={() => setCart(cart.filter(i => i.cartId !== item.cartId))} className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-xs">✕</button>
+                                            {item.toppings?.length > 0 && (
+                                                <p className="text-xs text-slate-400 mt-1">+ {item.toppings.map(t => t.name).join(', ')}</p>
+                                            )}
+                                            <button onClick={() => setCart(cart.filter(i => i.cartId !== item.cartId))} className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-xs shadow-md">✕</button>
                                         </div>
                                     ))}
                                 </div>
@@ -219,94 +225,85 @@
                         </div>
                     )}
 
-                    {/* VIEW: ADMIN */}
+                    {/* VIEW: ADMIN (จัดการร้าน) */}
                     {view === 'admin' && (
                         <div className="flex-1 flex flex-col bg-white overflow-hidden">
                             <div className="flex border-b bg-slate-50 px-8 pt-4 gap-6">
-                                <button onClick={() => setAdminTab('products')} className={`pb-3 font-bold border-b-4 ${adminTab==='products'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>สินค้า</button>
-                                <button onClick={() => setAdminTab('categories')} className={`pb-3 font-bold border-b-4 ${adminTab==='categories'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>หมวดหมู่</button>
-                                <button onClick={() => setAdminTab('modifiers')} className={`pb-3 font-bold border-b-4 ${adminTab==='modifiers'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>ตัวเลือก</button>
+                                <button onClick={() => setAdminTab('products')} className={`pb-3 font-bold border-b-4 transition-all ${adminTab==='products'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>สินค้า</button>
+                                <button onClick={() => setAdminTab('categories')} className={`pb-3 font-bold border-b-4 transition-all ${adminTab==='categories'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>หมวดหมู่</button>
+                                <button onClick={() => setAdminTab('modifiers')} className={`pb-3 font-bold border-b-4 transition-all ${adminTab==='modifiers'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>ตัวเลือก</button>
                             </div>
+
                             <div className="flex-1 p-8 overflow-y-auto">
                                 <div className="max-w-4xl mx-auto">
                                     {adminTab === 'products' && (
                                         <div className="space-y-6">
                                             <div className="flex justify-between items-center">
-                                                <h2 className="text-2xl font-bold">รายการสินค้า</h2>
-                                                <button onClick={() => {setEditingProduct(null); setForm({name:'', price:'', cost:'', categoryId:1}); setShowProductModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มสินค้า</button>
+                                                <h2 className="text-2xl font-bold text-slate-800">รายการสินค้า</h2>
+                                                <button onClick={() => {setEditingProduct(null); setForm({name:'', price:'', cost:'', categoryId:1}); setShowProductModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold active-scale">+ เพิ่มสินค้า</button>
                                             </div>
                                             <div className="grid gap-3">
                                                 {products.map(p => (
-                                                    <div key={p.id} className="flex justify-between items-center p-5 bg-slate-50 rounded-3xl border">
-                                                        <span className="font-bold text-lg">{p.name}</span>
-                                                        <div className="flex items-center gap-4">
-                                                            <span className="text-blue-600 font-bold">{p.price}฿</span>
-                                                            <button onClick={() => {setEditingProduct(p); setForm(p); setShowProductModal(true);}} className="text-teal font-bold bg-teal-50 px-4 py-1 rounded-lg">แก้ไข</button>
-                                                            <button onClick={async () => {if(confirm('ลบ?')) {await db.products.delete(p.id); refreshData();}}} className="text-red-400">ลบ</button>
+                                                    <div key={p.id} className="flex justify-between items-center p-5 bg-slate-50 rounded-3xl border border-slate-100">
+                                                        <span className="font-bold text-lg text-slate-700">{p.name}</span>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-blue-600 font-black mr-4">{p.price}฿</span>
+                                                            <button onClick={() => {setEditingProduct(p); setForm(p); setShowProductModal(true);}} className="text-teal font-bold bg-teal-50 px-4 py-1.5 rounded-xl text-sm">แก้ไข</button>
+                                                            <button onClick={async () => {if(confirm('ลบสินค้า?')) {await db.products.delete(p.id); refreshData();}}} className="text-red-400 font-bold bg-red-50 px-4 py-1.5 rounded-xl text-sm">ลบ</button>
                                                         </div>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
+
                                     {adminTab === 'categories' && (
-                                        <div className="space-y-4">
-                                            <button onClick={async () => {const name = prompt("ชื่อหมวดหมู่:"); if(name) {await db.categories.add({name}); refreshData();}}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มหมวดหมู่</button>
-                                            {categories.map(c => (
-                                                <div key={c.id} className="p-4 border rounded-2xl flex justify-between items-center">
-                                                    <span className="font-bold">{c.name}</span>
-                                                    <div className="flex gap-2">
-                                                        <button onClick={async () => {const n = prompt("ชื่อใหม่:", c.name); if(n) {await db.categories.update(c.id, {name:n}); refreshData();}}} className="text-teal text-sm font-bold bg-teal-50 px-3 py-1 rounded-lg">แก้ไข</button>
-                                                        <button onClick={async () => {if(confirm('ลบ?')) {await db.categories.delete(c.id); refreshData();}}} className="text-red-400 text-sm">ลบ</button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {adminTab === 'modifiers' && (
-                                        <div className="space-y-4">
+                                        <div className="space-y-6">
                                             <div className="flex justify-between items-center">
-                                                <h2 className="text-2xl font-bold">กลุ่มตัวเลือกสินค้า</h2>
-                                                <button onClick={() => {setEditingModifier(null); setModForm({name:'', selectionType:'single', applyTo:'all', targetIds:[], isRequired: false, options:[{name:'', price:0, cost:0, isDefault:false}]}); setShowModifierModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มกลุ่มตัวเลือก</button>
+                                                <h2 className="text-2xl font-bold text-slate-800">หมวดหมู่สินค้า</h2>
+                                                <button onClick={handleAddCategory} className="btn-teal text-white px-6 py-2 rounded-xl font-bold active-scale">+ เพิ่มหมวดหมู่</button>
                                             </div>
-                                            {modifiers.map(m => (
-                                                <div key={m.id} className="p-5 border rounded-3xl bg-slate-50">
-                                                    <div className="flex justify-between font-bold mb-2">
-                                                        <span>{m.name} {m.isRequired && <span className="text-red-500 text-xs">(บังคับ)</span>}</span>
+                                            <div className="grid gap-3">
+                                                {categories.map(c => (
+                                                    <div key={c.id} className="p-5 border rounded-3xl flex justify-between items-center bg-slate-50">
+                                                        <span className="font-bold text-slate-700">{c.name}</span>
                                                         <div className="flex gap-2">
-                                                            <button onClick={() => {setEditingModifier(m); setModForm(m); setShowModifierModal(true);}} className="text-teal text-sm font-bold bg-teal-50 px-3 py-1 rounded-lg">แก้ไข</button>
-                                                            <button onClick={async () => {if(confirm('ลบ?')) {await db.modifierGroups.delete(m.id); refreshData();}}} className="text-red-400 text-sm">ลบ</button>
+                                                            <button onClick={() => handleEditCategory(c)} className="text-teal font-bold bg-teal-50 px-4 py-1.5 rounded-xl text-sm">แก้ไข</button>
+                                                            <button onClick={() => handleDeleteCategory(c.id)} className="text-red-400 font-bold bg-red-50 px-4 py-1.5 rounded-xl text-sm">ลบ</button>
                                                         </div>
                                                     </div>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {m.options.map((o, i) => <span key={i} className="bg-white px-3 py-1 rounded-xl text-xs border">{o.name} (+{o.price})</span>)}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
-                    {view === 'report' && (
-                        <div className="flex-1 p-8 overflow-y-auto bg-white">
-                            <div className="max-w-4xl mx-auto">
-                                <h2 className="text-3xl font-bold mb-8">รายงานยอดขาย</h2>
-                                <div className="grid grid-cols-2 gap-6 mb-8">
-                                    <div className="luecha-blue p-8 rounded-[2.5rem] text-white">
-                                        <p className="opacity-70">ยอดขายรวม</p>
-                                        <p className="text-5xl font-black">{orders.reduce((s, o) => s + Number(o.total), 0).toLocaleString()}฿</p>
-                                    </div>
-                                    <div className="bg-slate-100 p-8 rounded-[2.5rem]">
-                                        <p className="text-slate-500">จำนวนบิล</p>
-                                        <p className="text-5xl font-black">{orders.length}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                                    {adminTab === 'modifiers' && (
+                                        <div className="space-y-6">
+                                            <div className="flex justify-between items-center">
+                                                <h2 className="text-2xl font-bold text-slate-800">กลุ่มตัวเลือกสินค้า</h2>
+                                                <button onClick={() => {setEditingModifier(null); setModForm({name:'', selectionType:'single', applyTo:'all', targetIds:[], targetCategoryIds:[], isRequired: false, options:[{name:'', price:0, cost:0, isDefault:false}]}); setShowModifierModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold active-scale">+ เพิ่มกลุ่มตัวเลือก</button>
+                                            </div>
+                                            <div className="grid gap-4">
+                                                {modifiers.map(m => (
+                                                    <div key={m.id} className="p-6 border rounded-[2rem] bg-slate-50">
+                                                        <div className="flex justify-between font-bold mb-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-lg text-slate-800">{m.name}</span>
+                                                                {m.isRequired && <span className="bg-red-100 text-red-500 text-[10px] px-2 py-0.5 rounded-full">บังคับ</span>}
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={() => {setEditingModifier(m); setModForm(m); setShowModifierModal(true);}} className="text-teal font-bold bg-white border border-teal-100 px-4 py-1.5 rounded-xl text-sm shadow-sm">แก้ไข</button>
+                                                                <button onClick={async () => {if(confirm('ลบกลุ่มตัวเลือก?')) {await db.modifierGroups.delete(m.id); refreshData();}}} className="text-red-400 font-bold bg-white border border-red-100 px-4 py-1.5 rounded-xl text-sm shadow-sm">ลบ</button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {m.options.map((o, i) => <span key={i} className="bg-white px-3 py-1.5 rounded-xl text-xs border border-slate-200 text-slate-500">{o.name} (+{o.price})</span>)}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                {/* ==========================================
                         PART 6: MODALS
