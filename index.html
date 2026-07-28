@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lue cha POS | Final Master Template</title>
+    <title>Lue cha POS | Final Stable Version</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -26,44 +26,56 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 1. Database (ล็อคชื่อเดิมถาวร) ---
-        const db = new Dexie("LueCha_POS_Production_DB");
+        // --- 1. DATABASE CONFIGURATION (PERMANENT) ---
+        const db = new Dexie("LueCha_POS_FINAL_STABLE");
         db.version(1).stores({
+            products: "++id, name, price, cost, categoryId",
             categories: "++id, name",
-            products: "++id, name, price, cost, deliveryPrices, categoryId",
-            modifierGroups: "++id, name, options",
-            orders: "++id, total, timestamp, paymentMethod, items, queue"
+            orders: "++id, total, timestamp, paymentMethod, items"
         });
 
-        const TOPPINGS_LIST = [
-            { name: "วิปครีม", price: 20 },
-            { name: "ชีสขูด", price: 20 }
+        // --- INITIAL SEED DATA ---
+        const SEED_PRODUCTS = [
+            { name: "ชาไทย (Thai Tea)", price: 35, cost: 15, categoryId: 1 },
+            { name: "โกโก้ (Cocoa)", price: 35, cost: 18, categoryId: 1 }
         ];
 
         function App() {
-            const [view, setView] = useState('pos');
-            const [adminTab, setAdminTab] = useState('products');
+            // --- CORE STATES ---
+            const [view, setView] = useState('pos'); // pos, admin, report
             const [products, setProducts] = useState([]);
             const [categories, setCategories] = useState([]);
             const [orders, setOrders] = useState([]);
             const [cart, setCart] = useState([]);
 
             // --- MODAL STATES ---
-            const [selectedItem, setSelectedItem] = useState(null); // สำหรับ Image 5 (เลือกไซส์/ท็อปปิ้ง)
-            const [showProductModal, setShowProductModal] = useState(false); // สำหรับ Image 7 (เพิ่ม/แก้ไข)
+            const [selectedItem, setSelectedItem] = useState(null); // Image 5
+            const [showProductModal, setShowProductModal] = useState(false); // Image 7
             const [editingProduct, setEditingProduct] = useState(null);
+            const [showPayment, setShowPayment] = useState(false); // Image 4
 
             // --- SELECTION STATES (Image 5) ---
             const [qty, setQty] = useState(1);
-            const [selectedSize, setSelectedSize] = useState('S');
-            const [activeToppings, setActiveToppings] = useState([]);
+            const [size, setSize] = useState('S');
+            const [toppings, setToppings] = useState([]);
 
             // --- FORM STATES (Image 7) ---
             const [form, setForm] = useState({ name: '', price: '', cost: '', categoryId: 1 });
             const [openSection, setOpenSection] = useState('category');
 
+            // --- PAYMENT STATES ---
+            const [cashReceived, setCashReceived] = useState(0);
+            const [paymentMethod, setPaymentMethod] = useState('cash');
+
+            // --- INITIALIZATION ---
             useEffect(() => {
-                refreshData();
+                const init = async () => {
+                    const pCount = await db.products.count();
+                    if (pCount === 0) await db.products.bulkAdd(SEED_PRODUCTS);
+                    if (await db.categories.count() === 0) await db.categories.add({ name: "เครื่องดื่ม" });
+                    refreshData();
+                };
+                init();
             }, []);
 
             const refreshData = async () => {
@@ -72,35 +84,33 @@
                 setOrders(await db.orders.toArray());
             };
 
-            // --- MATH LOGIC ---
+            // --- CALCULATIONS ---
             const currentItemTotal = useMemo(() => {
                 if (!selectedItem) return 0;
                 let base = Number(selectedItem.price);
-                if (selectedSize === 'M') base += 5;
-                if (selectedSize === 'L') base += 10;
-                const toppingSum = activeToppings.reduce((s, t) => s + Number(t.price), 0);
+                if (size === 'M') base += 5;
+                if (size === 'L') base += 10;
+                const toppingSum = toppings.reduce((s, t) => s + Number(t.price), 0);
                 return (base + toppingSum) * Number(qty);
-            }, [selectedItem, selectedSize, activeToppings, qty]);
+            }, [selectedItem, size, toppings, qty]);
 
             const cartTotal = useMemo(() => cart.reduce((s, i) => s + Number(i.totalPrice), 0), [cart]);
+            const changeAmount = useMemo(() => Math.max(0, Number(cashReceived) - cartTotal), [cashReceived, cartTotal]);
 
-            // --- ACTIONS ---
+            // --- HANDLERS ---
+            const handleProductClick = (p) => {
+                setSelectedItem(p);
+                setQty(1); setSize('S'); setToppings([]);
+            };
+
             const handleAddToCart = () => {
-                const item = {
-                    ...selectedItem,
-                    cartId: Date.now(),
-                    qty: Number(qty),
-                    size: selectedSize,
-                    toppings: activeToppings,
-                    totalPrice: currentItemTotal
-                };
+                const item = { ...selectedItem, cartId: Date.now(), qty, size, toppings, totalPrice: currentItemTotal };
                 setCart([...cart, item]);
                 setSelectedItem(null);
-                setQty(1); setSelectedSize('S'); setActiveToppings([]);
             };
 
             const handleSaveProduct = async () => {
-                if(!form.name || !form.price) return alert("กรุณากรอกชื่อและราคา");
+                if (!form.name || !form.price) return alert("กรุณากรอกชื่อและราคา");
                 const data = { ...form, price: Number(form.price), cost: Number(form.cost || 0), categoryId: Number(form.categoryId) };
                 if (editingProduct) data.id = editingProduct.id;
                 await db.products.put(data);
@@ -110,15 +120,16 @@
                 refreshData();
             };
 
-            const handleCheckout = async () => {
-                await db.orders.add({ total: cartTotal, timestamp: new Date(), paymentMethod: 'cash', items: cart });
-                setCart([]);
+            const handleConfirmPayment = async () => {
+                if (paymentMethod === 'cash' && Number(cashReceived) < cartTotal) return alert("เงินรับมาไม่พอ");
+                await db.orders.add({ total: cartTotal, timestamp: new Date(), paymentMethod, items: cart });
+                setCart([]); setShowPayment(false); setCashReceived(0);
                 refreshData();
                 alert("ชำระเงินสำเร็จ!");
             };
 
             return (
-                <div className="h-screen flex flex-col overflow-hidden">
+                <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
                     {/* Header */}
                     <header className="luecha-blue p-4 text-white flex justify-between items-center shadow-lg z-10">
                         <h1 className="font-bold text-xl">เลื่องชื่อลือชา POS</h1>
@@ -131,10 +142,10 @@
 
                     {/* VIEW: POS */}
                     {view === 'pos' && (
-                        <div className="flex-1 flex overflow-hidden bg-slate-100">
+                        <div className="flex-1 flex overflow-hidden">
                             <div className="flex-1 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto no-scrollbar">
                                 {products.map(p => (
-                                    <button key={p.id} onClick={() => setSelectedItem(p)}
+                                    <button key={p.id} onClick={() => handleProductClick(p)}
                                         className="bg-white p-5 rounded-[2rem] shadow-sm active-scale flex flex-col items-center justify-center h-44 border-2 border-transparent hover:border-orange-500 transition-all">
                                         <span className="font-bold text-slate-800 text-lg">{p.name}</span>
                                         <span className="text-blue-700 font-black text-2xl">{p.price}฿</span>
@@ -159,7 +170,7 @@
                                         <span>รวม</span>
                                         <span>{cartTotal}฿</span>
                                     </div>
-                                    <button onClick={handleCheckout} disabled={cart.length===0} className="w-full luecha-orange text-white py-5 rounded-3xl font-bold text-xl active-scale disabled:opacity-30">ชำระเงิน</button>
+                                    <button onClick={() => setShowPayment(true)} disabled={cart.length===0} className="w-full luecha-orange text-white py-5 rounded-3xl font-bold text-xl active-scale disabled:opacity-30">ชำระเงิน</button>
                                 </div>
                             </div>
                         </div>
@@ -167,28 +178,23 @@
 
                     {/* VIEW: ADMIN */}
                     {view === 'admin' && (
-                        <div className="flex-1 flex flex-col bg-white overflow-hidden">
-                            <div className="flex border-b bg-slate-50 px-8 pt-4 gap-6">
-                                <button onClick={() => setAdminTab('products')} className={`pb-3 font-bold border-b-4 ${adminTab==='products'?'border-blue-700 text-blue-700':'border-transparent text-slate-400'}`}>สินค้า</button>
-                            </div>
-                            <div className="flex-1 p-8 overflow-y-auto">
-                                <div className="max-w-4xl mx-auto">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-2xl font-bold text-slate-800">รายการสินค้า</h2>
-                                        <button onClick={() => {setEditingProduct(null); setForm({name:'', price:'', cost:'', categoryId:1}); setShowProductModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มสินค้า</button>
-                                    </div>
-                                    <div className="grid gap-3">
-                                        {products.map(p => (
-                                            <div key={p.id} className="flex justify-between items-center p-5 bg-slate-50 rounded-3xl border">
-                                                <span className="font-bold text-lg">{p.name}</span>
-                                                <div className="flex items-center gap-4">
-                                                    <span className="text-blue-600 font-bold">{p.price}฿</span>
-                                                    <button onClick={() => {setEditingProduct(p); setForm(p); setShowProductModal(true);}} className="text-teal font-bold bg-teal-50 px-4 py-1 rounded-lg">แก้ไข</button>
-                                                    <button onClick={async () => {if(confirm('ลบ?')) {await db.products.delete(p.id); refreshData();}}} className="text-red-400">ลบ</button>
-                                                </div>
+                        <div className="flex-1 p-8 overflow-y-auto bg-white">
+                            <div className="max-w-4xl mx-auto">
+                                <div className="flex justify-between items-center mb-8">
+                                    <h2 className="text-2xl font-bold">รายการสินค้า</h2>
+                                    <button onClick={() => {setEditingProduct(null); setForm({name:'', price:'', cost:'', categoryId:1}); setShowProductModal(true);}} className="btn-teal text-white px-6 py-2 rounded-xl font-bold">+ เพิ่มสินค้า</button>
+                                </div>
+                                <div className="grid gap-3">
+                                    {products.map(p => (
+                                        <div key={p.id} className="flex justify-between items-center p-5 bg-slate-50 rounded-3xl border">
+                                            <span className="font-bold text-lg">{p.name}</span>
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-blue-600 font-bold">{p.price}฿</span>
+                                                <button onClick={() => {setEditingProduct(p); setForm(p); setShowProductModal(true);}} className="text-teal font-bold bg-teal-50 px-4 py-1 rounded-lg">แก้ไข</button>
+                                                <button onClick={async () => {if(confirm('ลบ?')) {await db.products.delete(p.id); refreshData();}}} className="text-red-400">ลบ</button>
                                             </div>
-                                        ))}
-                                    </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>
@@ -213,12 +219,12 @@
                         </div>
                     )}
 
-                    {/* --- MODAL: ยืนยันจำนวนสินค้า (Image 5) --- */}
+                    {/* MODAL: IMAGE 5 (Ordering) */}
                     {selectedItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
                                 <div className="p-4 border-b flex justify-between items-center">
-                                    <span className="font-bold text-slate-700 tracking-tight">ยืนยันจำนวนสินค้า</span>
+                                    <span className="font-bold text-slate-700">ยืนยันจำนวนสินค้า</span>
                                     <button onClick={() => setSelectedItem(null)} className="text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center">✕</button>
                                 </div>
                                 <div className="flex flex-col md:flex-row">
@@ -248,8 +254,8 @@
                                             <p className="font-bold mb-4">ไซส์ <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">จำเป็น</span></p>
                                             <div className="grid grid-cols-3 gap-2">
                                                 {['S', 'M', 'L'].map(s => (
-                                                    <button key={s} onClick={() => setSelectedSize(s)}
-                                                        className={`py-4 rounded-2xl font-bold border-2 transition-all ${selectedSize===s?'btn-teal text-white border-transparent':'bg-white border-slate-100 text-slate-400'}`}>
+                                                    <button key={s} onClick={() => setSize(s)}
+                                                        className={`py-4 rounded-2xl font-bold border-2 transition-all ${size===s?'btn-teal text-white border-transparent':'bg-white border-slate-100 text-slate-400'}`}>
                                                         {s} <div className="text-[10px] font-normal">{s==='S'?'':s==='M'?'+5':'+10'}</div>
                                                     </button>
                                                 ))}
@@ -258,12 +264,12 @@
                                         <div>
                                             <p className="font-bold mb-4">ท็อปปิ้ง <span className="bg-slate-200 text-slate-500 text-[10px] px-2 py-0.5 rounded-full font-normal">ไม่บังคับ</span></p>
                                             <div className="flex flex-wrap gap-2">
-                                                {TOPPINGS_LIST.map(t => {
-                                                    const isSel = activeToppings.find(x => x.name === t.name);
+                                                {[{name:'วิปครีม',price:20},{name:'ชีสขูด',price:20}].map(t => {
+                                                    const isSel = toppings.find(x => x.name === t.name);
                                                     return (
                                                         <button key={t.name} onClick={() => {
-                                                            const next = isSel ? activeToppings.filter(x => x.name !== t.name) : [...activeToppings, t];
-                                                            setActiveToppings(next);
+                                                            const next = isSel ? toppings.filter(x => x.name !== t.name) : [...toppings, t];
+                                                            setToppings(next);
                                                         }} className={`px-4 py-2 rounded-full border-2 text-sm transition-all ${isSel?'border-teal-500 bg-teal-50 text-teal-600 font-bold':'bg-white border-slate-100 text-slate-400'}`}>
                                                             {t.name} +{t.price}
                                                         </button>
@@ -280,7 +286,7 @@
                         </div>
                     )}
 
-                    {/* --- MODAL: เพิ่ม/แก้ไขสินค้า (Image 7) --- */}
+                    {/* MODAL: IMAGE 7 (Add/Edit) */}
                     {showProductModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
@@ -322,7 +328,6 @@
                                             </button>
                                             {openSection === 'category' && (
                                                 <div className="p-4 bg-slate-50 flex flex-wrap gap-2 border-t">
-                                                    <button className="border-2 border-dashed border-teal-500 text-teal-600 px-4 py-2 rounded-full text-sm font-bold">+ เพิ่มหมวด</button>
                                                     {categories.map(c => (
                                                         <button key={c.id} onClick={() => setForm({...form, categoryId: c.id})}
                                                             className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${form.categoryId===c.id?'btn-teal text-white':'bg-white text-slate-400 border'}`}>
@@ -338,6 +343,57 @@
                                     <button onClick={handleSaveProduct} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale flex items-center justify-center gap-3 shadow-lg">
                                         💾 บันทึก
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MODAL: IMAGE 4 (Payment) */}
+                    {showPayment && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                            <div className="bg-white w-full max-w-4xl rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col">
+                                <div className="p-4 border-b flex justify-between items-center">
+                                    <span className="font-bold text-slate-700">ชำระเงิน</span>
+                                    <button onClick={() => setShowPayment(false)} className="text-2xl">✕</button>
+                                </div>
+                                <div className="flex flex-col md:flex-row">
+                                    <div className="flex-1 p-8 space-y-6 border-r">
+                                        <div className="btn-teal text-white p-8 rounded-3xl text-center shadow-inner">
+                                            <p className="text-sm opacity-70">ยอดรวม</p>
+                                            <p className="text-6xl font-black">{cartTotal}</p>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['cash', 'transfer', 'delivery'].map(m => (
+                                                <button key={m} onClick={() => setPaymentMethod(m)} className={`p-4 rounded-2xl border-2 transition-all ${paymentMethod===m?'border-teal-500 bg-teal-50 text-teal-600 font-bold':'border-slate-100 text-slate-400'}`}>
+                                                    {m.toUpperCase()}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-teal-100 flex justify-between items-center">
+                                                <span className="text-slate-400">รับมา</span>
+                                                <input type="number" className="bg-transparent text-3xl font-black text-right outline-none w-1/2 text-teal-600" 
+                                                    value={cashReceived || ''} onChange={e => setCashReceived(Number(e.target.value))} placeholder="0" />
+                                            </div>
+                                            <div className="flex justify-between p-4 text-2xl font-black">
+                                                <span className="text-slate-400 tracking-tight">เงินทอน</span>
+                                                <span className="text-red-500">{changeAmount} บาท</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="w-full md:w-96 p-8 bg-slate-50">
+                                        <p className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">รับเงินด่วน</p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button onClick={() => setCashReceived(cartTotal)} className="h-16 bg-green-100 text-green-700 font-bold rounded-xl">พอดี</button>
+                                            {[20, 50, 100, 500, 1000].map(v => (
+                                                <button key={v} onClick={() => setCashReceived(prev => Number(prev) + v)} className="h-16 bg-white border rounded-xl font-bold active-scale shadow-sm">{v}</button>
+                                            ))}
+                                            <button onClick={() => setCashReceived(0)} className="h-16 bg-red-50 text-red-500 font-bold rounded-xl">ล้าง</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-6 border-t">
+                                    <button onClick={handleConfirmPayment} className="w-full btn-teal text-white py-5 rounded-2xl font-bold text-xl active-scale shadow-lg">ยืนยันชำระเงิน</button>
                                 </div>
                             </div>
                         </div>
